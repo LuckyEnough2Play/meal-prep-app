@@ -4,13 +4,13 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "start:both": "concurrently \"npm run start\" \"npm run start:backend\"",
-    "start:backend": "cd meal-prep-backend && go run main.go",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "build": "expo export --platform web",
+    "vercel-build": "expo export --platform web"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",

@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 )
 
 type ProfileData struct {
@@ -42,7 +41,7 @@ type OpenAIResponse struct {
 
 func main() {
 	// Load environment variables
-	_ = godotenv.Load()
+
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		panic("OPENAI_API_KEY not set in environment")
