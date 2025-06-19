@@ -1,75 +1,123 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import { Alert, Button, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ProfileData } from "../../utils/types";
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const [form, setForm] = useState<ProfileData>({
+    groceryStore: "Walmart",
+    mealsPerWeek: 7,
+    peoplePerMeal: 2,
+    allergies: "None",
+    priceLimit: 10,
+  });
+
+  const handleChange = (key: keyof ProfileData, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      [key]: key === "mealsPerWeek" || key === "peoplePerMeal" || key === "priceLimit"
+        ? Number(value)
+        : value,
+    }));
+  };
+
+  const handleSubmit = () => {
+    if (!form.groceryStore || !form.mealsPerWeek || !form.peoplePerMeal || !form.priceLimit) {
+      Alert.alert("Please fill out all required fields.");
+      return;
+    }
+    router.push({
+      pathname: "/meal-plan",
+      params: {
+        groceryStore: form.groceryStore,
+        mealsPerWeek: String(form.mealsPerWeek),
+        peoplePerMeal: String(form.peoplePerMeal),
+        allergies: form.allergies,
+        priceLimit: String(form.priceLimit),
+      },
+    });
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Meal Prep Profile</Text>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Grocery Store *</Text>
+        <TextInput
+          style={styles.input}
+          value={form.groceryStore}
+          onChangeText={(v) => handleChange("groceryStore", v)}
+          placeholder="e.g. Walmart"
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      </View>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Meals per Week *</Text>
+        <TextInput
+          style={styles.input}
+          value={String(form.mealsPerWeek)}
+          onChangeText={(v) => handleChange("mealsPerWeek", v)}
+          keyboardType="number-pad"
+        />
+      </View>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>People per Meal *</Text>
+        <TextInput
+          style={styles.input}
+          value={String(form.peoplePerMeal)}
+          onChangeText={(v) => handleChange("peoplePerMeal", v)}
+          keyboardType="number-pad"
+        />
+      </View>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Allergies</Text>
+        <TextInput
+          style={styles.input}
+          value={form.allergies}
+          onChangeText={(v) => handleChange("allergies", v)}
+          placeholder="e.g. peanuts, gluten"
+        />
+      </View>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Price Limit per Person ($) *</Text>
+        <TextInput
+          style={styles.input}
+          value={String(form.priceLimit)}
+          onChangeText={(v) => handleChange("priceLimit", v)}
+          keyboardType="decimal-pad"
+        />
+      </View>
+      <Button title="Get Meal Plan" onPress={handleSubmit} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    padding: 24,
+    backgroundColor: "#fff",
+    flexGrow: 1,
+    justifyContent: "center",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 24,
+    textAlign: "center",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  formGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 6,
+    padding: 10,
+    fontSize: 16,
+    backgroundColor: "#f9f9f9",
   },
 });
