@@ -1,7 +1,7 @@
 import { MealPlan, ProfileData } from "./types";
 
 export async function fetchMealPlan(profile: ProfileData): Promise<MealPlan> {
-  const res = await fetch("http://localhost:8080/api/mealplan", {
+const res = await fetch("/api/mealplan", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(profile),

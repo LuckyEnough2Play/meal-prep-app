@@ -8,22 +8,17 @@ https://meals.luckandloot.gg
 
 All environment variables (including the OpenAI API key) are configured in Vercel’s dashboard. Vercel serves the static export from the `dist/` directory.
 
-Local build:
-```bash
-npm install
-npm run build
-npx serve dist
-```
+To deploy changes, commit and push to the main branch and Vercel will rebuild and publish automatically.
 
-PowerShell:
+
+### PowerShell
 ```powershell
-# In PowerShell, chaining with `&&` is not supported.
-# Run each command separately:
-git add vercel.json package.json
-git commit -m "chore: configure Vercel static-build to use 'dist' output directory"
+git add .
+git commit -m "Update vercel config for correct outputDirectory"
 git push origin meal-prep-app
 ```
 
+
 ## Source
 
-Frontend and backend code are hosted in this repository. Pull requests and issues are welcome via GitHub.
+Frontend code is hosted in this repository. Pull requests and issues are welcome via GitHub.

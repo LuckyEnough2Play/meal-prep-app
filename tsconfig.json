@@ -6,7 +6,9 @@
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "moduleResolution": "node",
+    "types": ["node", "next"]
   },
   "include": [
     "**/*.ts",

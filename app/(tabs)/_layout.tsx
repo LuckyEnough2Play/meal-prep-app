@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
@@ -10,6 +10,15 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      document.querySelectorAll('[aria-hidden=\"true\"]').forEach(el => {
+        el.removeAttribute("aria-hidden");
+        el.setAttribute("inert", "");
+      });
+    }
+  }, []);
 
   return (
     <Tabs
