@@ -6,7 +6,7 @@ This document tracks all major tasks, milestones, and operational events for the
 
 | Task ID | Task Description                                 | Status   | Completed By | Completion Date | How Completed / Details                |
 |---------|--------------------------------------------------|----------|--------------|----------------|----------------------------------------|
-| 1       | Create GitHub repo                               | Completed | LuckyEnough2Play | 06/26/2025      | Repo created at https://github.com/LuckyEnough2Play/meal-prep-app; local folder not yet linked |
+| 1       | Create GitHub repo                               | Completed | LuckyEnough2Play | 06/26/2025      | Repo created at https://github.com/LuckyEnough2Play/meal-prep-app; local folder linked and initial push of three files (process_requirement_document.md, task_history_document.md, Gravity_Transformation_Recipe_Book.pdf) |
 | 2       | Set up Vercel project & deployment               | Completed | LuckyEnough2Play | 06/26/2025      | Vercel project "meal-prep-app" created; domains configured (meals.luckandloot.gg, meal-prep-app-jet.vercel.app, etc.) |
 | 3       | Set up Supabase project & DB                     | Completed | LuckyEnough2Play | 06/26/2025      | Supabase project created; database schema pending implementation |
 | 4       | Configure environment variables (Vercel, Supabase) | Completed | LuckyEnough2Play | 06/26/2025      | EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY, OpenAI_Key added under Vercel Environment Variables |
