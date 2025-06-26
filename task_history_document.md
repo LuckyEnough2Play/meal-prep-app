@@ -10,8 +10,8 @@ This document tracks all major tasks, milestones, and operational events for the
 | 2       | Set up Vercel project & deployment               | Completed | LuckyEnough2Play | 06/26/2025      | Vercel project "meal-prep-app" created; domains configured (meals.luckandloot.gg, meal-prep-app-jet.vercel.app, etc.) |
 | 3       | Set up Supabase project & DB                     | Completed | LuckyEnough2Play | 06/26/2025      | Supabase project created; database schema pending implementation |
 | 4       | Configure environment variables (Vercel, Supabase) | Completed | LuckyEnough2Play | 06/26/2025      | EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY, OpenAI_Key added under Vercel Environment Variables |
-| 5       | Implement user authentication/profile            | Pending  | -            | -              | -                                      |
-| 6       | Model ingredient & meal data (from recipe book)  | Pending  | -            | -              | -                                      |
+| 5       | Implement user authentication/profile            | Completed | WithA        | 06/26/2025     | Supabase Auth and profile setup implemented (signup, signin, profile, context, routing) |
+| 6       | Model ingredient & meal data (from recipe book)  | Completed | WithA        | 06/26/2025     | SQL schema created; ingredients seeded via scripts (codes from recipe book) |
 | 7       | Build vendor scraping modules                    | Pending  | -            | -              | -                                      |
 | 8       | Vendor selection UI                              | Pending  | -            | -              | -                                      |
 | 9       | Meal suggestion engine                           | Pending  | -            | -              | -                                      |

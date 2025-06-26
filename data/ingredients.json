@@ -1,0 +1,7 @@
+[
+  { "code": "Red", "name": "Protein" },
+  { "code": "Orange", "name": "Fatty Protein" },
+  { "code": "Yellow", "name": "Fat" },
+  { "code": "Blue", "name": "Carbohydrate" },
+  { "code": "Green", "name": "Vegetable" }
+]
