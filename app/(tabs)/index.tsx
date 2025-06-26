@@ -1,123 +1,70 @@
+import MealPlanView from "@/components/MealPlan/MealPlanView";
+import { fetchMealPlan } from "@/utils/gptClient";
+import { supabase } from "@/utils/supabase";
+import { MealPlan, ProfileData } from "@/utils/types";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import { Alert, Button, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { ProfileData } from "../../utils/types";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [form, setForm] = useState<ProfileData>({
-    groceryStore: "Walmart",
-    mealsPerWeek: 7,
-    peoplePerMeal: 2,
-    allergies: "None",
-    priceLimit: 10,
-  });
+  const [loading, setLoading] = useState(true);
+  const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
 
-  const handleChange = (key: keyof ProfileData, value: string) => {
-    setForm((prev) => ({
-      ...prev,
-      [key]: key === "mealsPerWeek" || key === "peoplePerMeal" || key === "priceLimit"
-        ? Number(value)
-        : value,
-    }));
-  };
+  useEffect(() => {
+    (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!user) {
+-        router.replace("/profile");
++        router.replace("profile");
+        return;
+      }
 
-  const handleSubmit = () => {
-    if (!form.groceryStore || !form.mealsPerWeek || !form.peoplePerMeal || !form.priceLimit) {
-      Alert.alert("Please fill out all required fields.");
-      return;
-    }
-    router.push({
-      pathname: "/meal-plan",
-      params: {
-        groceryStore: form.groceryStore,
-        mealsPerWeek: String(form.mealsPerWeek),
-        peoplePerMeal: String(form.peoplePerMeal),
-        allergies: form.allergies,
-        priceLimit: String(form.priceLimit),
-      },
-    });
-  };
+      const { data, error } = await supabase
+        .from<ProfileData & { user_id: string }>("profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
 
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Meal Prep Profile</Text>
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Grocery Store *</Text>
-        <TextInput
-          style={styles.input}
-          value={form.groceryStore}
-          onChangeText={(v) => handleChange("groceryStore", v)}
-          placeholder="e.g. Walmart"
-        />
+      if (error || !data) {
+-        router.replace("/profile");
++        router.replace("profile");
+        return;
+      }
+
+      const profile: ProfileData = {
+        groceryStore: data.groceryStore,
+        mealsPerWeek: data.mealsPerWeek,
+        peoplePerMeal: data.peoplePerMeal,
+        allergies: data.allergies,
+        priceLimit: data.priceLimit,
+      };
+
+      try {
+        const plan = await fetchMealPlan(profile);
+        setMealPlan(plan);
+      } catch (err) {
+        console.error("Error fetching meal plan:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return <ActivityIndicator style={{ flex: 1 }} />;
+  }
+
+  if (!mealPlan) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text>No meal plan available.</Text>
       </View>
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Meals per Week *</Text>
-        <TextInput
-          style={styles.input}
-          value={String(form.mealsPerWeek)}
-          onChangeText={(v) => handleChange("mealsPerWeek", v)}
-          keyboardType="number-pad"
-        />
-      </View>
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>People per Meal *</Text>
-        <TextInput
-          style={styles.input}
-          value={String(form.peoplePerMeal)}
-          onChangeText={(v) => handleChange("peoplePerMeal", v)}
-          keyboardType="number-pad"
-        />
-      </View>
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Allergies</Text>
-        <TextInput
-          style={styles.input}
-          value={form.allergies}
-          onChangeText={(v) => handleChange("allergies", v)}
-          placeholder="e.g. peanuts, gluten"
-        />
-      </View>
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Price Limit per Person ($) *</Text>
-        <TextInput
-          style={styles.input}
-          value={String(form.priceLimit)}
-          onChangeText={(v) => handleChange("priceLimit", v)}
-          keyboardType="decimal-pad"
-        />
-      </View>
-      <Button title="Get Meal Plan" onPress={handleSubmit} />
-    </ScrollView>
-  );
+    );
+  }
+
+  return <MealPlanView mealPlan={mealPlan} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 24,
-    backgroundColor: "#fff",
-    flexGrow: 1,
-    justifyContent: "center",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 24,
-    textAlign: "center",
-  },
-  formGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 6,
-    padding: 10,
-    fontSize: 16,
-    backgroundColor: "#f9f9f9",
-  },
-});
