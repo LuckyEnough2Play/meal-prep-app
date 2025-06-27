@@ -1,0 +1,17 @@
+{
+  "publix": {
+    "dealsUrl": "https://www.publix.com/deals",
+    "dealSelector": ".deal-item",
+    "scroll": false
+  },
+  "walmart": {
+    "dealsUrl": "https://www.walmart.com/cp/deals",
+    "dealSelector": ".search-result-gridview-item",
+    "scroll": true
+  },
+  "traderjoes": {
+    "dealsUrl": "https://www.traderjoes.com/deals",
+    "dealSelector": ".deal-card",
+    "scroll": false
+  }
+}

@@ -12,7 +12,7 @@ This document tracks all major tasks, milestones, and operational events for the
 | 4       | Configure environment variables (Vercel, Supabase) | Completed | LuckyEnough2Play | 06/26/2025      | EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY, OpenAI_Key added under Vercel Environment Variables |
 | 5       | Implement user authentication/profile            | Completed | WithA        | 06/26/2025     | Supabase Auth and profile setup implemented (signup, signin, profile, context, routing) |
 | 6       | Model ingredient & meal data (from recipe book)  | Completed | WithA        | 06/26/2025     | SQL schema created; ingredients seeded via scripts (codes from recipe book) |
-| 7       | Build vendor scraping modules                    | Pending  | -            | -              | -                                      |
+| 7       | Build vendor scraping modules                    | Completed | WithA        | 06/27/2025      | Implemented scraping modules with simulated pages; live selectors to be added post-MVP. |
 | 8       | Vendor selection UI                              | Pending  | -            | -              | -                                      |
 | 9       | Meal suggestion engine                           | Pending  | -            | -              | -                                      |
 | 10      | Swipable meal ticket UI                          | Pending  | -            | -              | -                                      |

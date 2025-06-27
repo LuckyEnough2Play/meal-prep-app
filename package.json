@@ -1,7 +1,19 @@
 {
+  "scripts": {
+    "test": "jest --passWithNoTests --coverage"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.2",
     "dotenv": "^16.6.0",
-    "pdf-parse": "^1.1.1"
+    "pdf-parse": "^1.1.1",
+    "puppeteer": "^24.11.0"
+  },
+  "devDependencies": {
+    "@types/cheerio": "^0.22.35",
+    "@types/jest": "^30.0.0",
+    "cheerio": "^1.1.0",
+    "jest": "^30.0.3",
+    "jest-environment-jsdom": "^30.0.2",
+    "ts-jest": "^29.4.0"
   }
 }
