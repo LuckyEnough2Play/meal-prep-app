@@ -13,7 +13,7 @@ This document tracks all major tasks, milestones, and operational events for the
 | 5       | Implement user authentication/profile            | Completed | WithA        | 06/26/2025     | Supabase Auth and profile setup implemented (signup, signin, profile, context, routing) |
 | 6       | Model ingredient & meal data (from recipe book)  | Completed | WithA        | 06/26/2025     | SQL schema created; ingredients seeded via scripts (codes from recipe book) |
 | 7       | Build vendor scraping modules                    | Completed | WithA        | 06/27/2025      | Implemented scraping modules with simulated pages; live selectors to be added post-MVP. |
-| 8       | Vendor selection UI                              | Pending  | -            | -              | -                                      |
+| 8       | Vendor selection UI                              | Completed | WithA        | 06/27/2025      | Implemented vendor preference page and DB column (commit 7ba84bc) |
 | 9       | Meal suggestion engine                           | Pending  | -            | -              | -                                      |
 | 10      | Swipable meal ticket UI                          | Pending  | -            | -              | -                                      |
 | 11      | Cart & checkout flow                             | Pending  | -            | -              | -                                      |

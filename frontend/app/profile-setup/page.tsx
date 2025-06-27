@@ -58,7 +58,7 @@ export default function ProfileSetupPage() {
     if (dbError) {
       setError(dbError.message);
     } else {
-      router.push('/');
+      router.push('/vendor-selection');
     }
   };
 

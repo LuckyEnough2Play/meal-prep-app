@@ -34,3 +34,12 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Vendor Selection
+
+After signing up and completing your basic profile, you will be redirected to the vendor selection page. Here you can choose one or more grocery vendors (e.g. Publix, Walmart, Trader Joe's).
+
+1. Use the checkboxes to mark your preferred vendors.
+2. Click **Save Preferences** to store them in your profile.
+
+The list of available vendors comes from `getVendorKeys()` in `frontend/services/vendorUtils.ts`, keeping the UI in sync with our scraping modules.
