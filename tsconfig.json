@@ -12,7 +12,6 @@
     "paths": {}
   },
   "include": [
-    "frontend/services/vendorScrapers",
-    "frontend/services/vendorScrapers/__tests__"
+    "frontend/services/**/*"
   ]
 }
