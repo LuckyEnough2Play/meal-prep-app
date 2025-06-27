@@ -6,7 +6,7 @@ module.exports = {
       tsconfig: 'tsconfig.json'
     }
   },
-  roots: ['<rootDir>/frontend/services/vendorScrapers'],
+  roots: ['<rootDir>/frontend/services'],
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   transform: {
