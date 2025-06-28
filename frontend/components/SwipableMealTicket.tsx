@@ -8,7 +8,7 @@ export interface SwipableMealTicketProps {
     id: string;
     name: string;
     instructions?: string;
-    nutrition?: Record<string, any>;
+    nutrition?: Record<string, number | undefined>;
     tags?: string[];
     savings?: number;
   };
@@ -52,3 +52,4 @@ export const SwipableMealTicket: React.FC<SwipableMealTicketProps> = ({
     </div>
   );
 };
+
