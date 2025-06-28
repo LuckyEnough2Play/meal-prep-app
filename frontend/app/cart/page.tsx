@@ -12,7 +12,7 @@ interface Nutrition {
 interface CartItem {
   id: string;
   name: string;
-  nutrition?: Nutrition;
+  nutrition?: { calories?: number; [key: string]: any };
 }
 
 export default function CartPage() {

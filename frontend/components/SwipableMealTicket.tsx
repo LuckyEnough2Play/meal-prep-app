@@ -8,7 +8,7 @@ export interface SwipableMealTicketProps {
     id: string;
     name: string;
     instructions?: string;
-    nutrition?: Record<string, number | undefined>;
+    nutrition?: Record<string, any>;
     tags?: string[];
     savings?: number;
   };

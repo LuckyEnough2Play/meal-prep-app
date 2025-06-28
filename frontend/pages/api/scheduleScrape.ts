@@ -12,7 +12,7 @@ interface ScrapeResult {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const results: ScrapeResult[] = [];
+  const results: Array<any> = [];
 
   for (const vendor of VENDORS) {
     try {
@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       if (error) throw error;
       results.push({ vendor, count: deals.length, status: 'ok' });
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error('Schedule scrape error:', vendor, err);
       const message = err instanceof Error ? err.message : String(err);
       await supabase.from('scrapeLogs').insert({
