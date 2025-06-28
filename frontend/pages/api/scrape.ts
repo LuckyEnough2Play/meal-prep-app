@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     return res.status(200).json({ vendor: vendorParam, count: deals.length });
-  } catch (err: any) {
+  } catch (err) {
     console.error('Scrape error:', vendorParam, err);
     const message = err instanceof Error ? err.message : String(err);
     // Log error to Supabase
@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       error: message,
       timestamp: new Date()
     });
-    return res.status(500).json({ error: err.message || 'Scrape failed' });
+    return res.status(500).json({ error: message || 'Scrape failed' });
   }
 }
 

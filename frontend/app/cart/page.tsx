@@ -4,15 +4,10 @@ import React, { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
 
-interface Nutrition {
-  calories?: number;
-  [key: string]: number | undefined;
-}
-
 interface CartItem {
   id: string;
   name: string;
-  nutrition?: { calories?: number; [key: string]: any };
+  nutrition?: Record<string, number | undefined>;
 }
 
 export default function CartPage() {
