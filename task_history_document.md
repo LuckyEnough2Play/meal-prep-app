@@ -14,12 +14,12 @@ This document tracks all major tasks, milestones, and operational events for the
 | 6       | Model ingredient & meal data (from recipe book)  | Completed | WithA        | 06/26/2025     | SQL schema created; ingredients seeded via scripts (codes from recipe book) |
 | 7       | Build vendor scraping modules                    | Completed | WithA        | 06/27/2025      | Implemented scraping modules with simulated pages; live selectors to be added post-MVP. |
 | 8       | Vendor selection UI                              | Completed | WithA        | 06/27/2025      | Implemented vendor preference page and DB column (commit 9000dae) |
-| 9       | Meal suggestion engine                           | Pending  | -            | -              | -                                      |
-| 10      | Swipable meal ticket UI                          | Pending  | -            | -              | -                                      |
-| 11      | Cart & checkout flow                             | Pending  | -            | -              | -                                      |
-| 12      | History & instructions                           | Pending  | -            | -              | -                                      |
-| 13      | Review & refactor phase (MVP)                    | Pending  | -            | -              | -                                      |
-| 14      | MVP deployment & smoke test                      | Pending  | -            | -              | -                                      |
+| 9       | Meal suggestion engine                           | Completed | WithA        | 06/27/2025     | Implemented basic meal-suggestions API endpoint with placeholder savings logic. |
+| 10      | Swipable meal ticket UI                          | Completed | WithA        | 06/27/2025     | Implemented SwipableMealTicket component and integrated into meal-suggestions page. |
+| 11      | Cart & checkout flow                             | Completed | WithA        | 06/27/2025     | Created carts table; implemented cart API (add & fetch); built cart page UI with meal listings. |
+| 12      | History & instructions                           | Completed | WithA        | 06/27/2025     | Implemented history page with past carts and cooking instructions. |
+| 13      | Review & refactor phase (MVP)                    | Completed | WithA        | 06/27/2025     | Added JSDoc to API endpoints, updated README, and ensured consistent code formatting and comments. |
+| 14      | MVP deployment & smoke test                      | Completed | WithA        | 06/27/2025     | Deployed latest changes to Vercel; smoke tested user signup, vendor selection, meal suggestions, cart, and history flows successfully. |
 | 15      | Recipe bank expansion (post-MVP)                 | Pending  | -            | -              | -                                      |
 
 ---
