@@ -648,6 +648,10 @@ export async function upsertGroupFromInvite(grp: GroupRow): Promise<void> {
   );
 }
 
+export async function updateGroupExpiry(groupId: string, newISO: string | null): Promise<void> {
+  await run(`UPDATE grp SET expires_at = ? WHERE id = ?`, [newISO ?? null, groupId]);
+}
+
 export async function getGroupById(groupId: string): Promise<GroupRow | null> {
   const rs = await run<SQLite.SQLResultSet>(`SELECT * FROM grp WHERE id = ?`, [groupId]);
   const r = (rs.rows as any)._array?.[0];

@@ -4,7 +4,7 @@ import { useApp } from '@/state/AppContext';
 import { Button } from '@/ui/Button';
 import { Input } from '@/ui/Input';
 import { SwitchRow } from '@/ui/SwitchRow';
-import { createGroup, listGroups, type GroupRow, upsertGroupFromInvite, addProfileCardToGroup, listProfileCards, computeCombinedProfile, setAppState, getAppState, getGroupById } from '@/db';
+import { createGroup, listGroups, type GroupRow, upsertGroupFromInvite, addProfileCardToGroup, computeCombinedProfile, setAppState, getAppState, getGroupById, updateGroupExpiry } from '@/db';
 import { setGroupKey, getGroupKey } from '@/storage/secure';
 import * as Crypto from 'expo-crypto';
 import { buildInviteURL, parseInviteURL } from '@/sync/invite';
@@ -27,6 +27,8 @@ export default function Groups() {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [combinedSummary, setCombinedSummary] = useState<string>('');
   const [activeGroupName, setActiveGroupName] = useState<string>('');
+  const [activeGroupExpiry, setActiveGroupExpiry] = useState<string | null>(null);
+  const [extendDays, setExtendDays] = useState('7');
 
   const load = async () => {
     setGroups(await listGroups());
@@ -35,6 +37,7 @@ export default function Groups() {
     if (ag) {
       const g = await getGroupById(ag);
       setActiveGroupName(g?.name || '');
+      setActiveGroupExpiry(g?.expiresAt || null);
       await refreshCombined(ag);
     }
   };
@@ -133,7 +136,7 @@ export default function Groups() {
           <View style={styles.groupRow}>
             <Text style={styles.groupName}>{item.name}</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Button title={activeGroupId === item.id ? 'Active' : 'Set Active'} onPress={async () => { await setAppState('active_group_id', item.id); setActiveGroupId(item.id); const g = await getGroupById(item.id); setActiveGroupName(g?.name || ''); await refreshCombined(item.id); }} />
+              <Button title={activeGroupId === item.id ? 'Active' : 'Set Active'} onPress={async () => { await setAppState('active_group_id', item.id); setActiveGroupId(item.id); const g = await getGroupById(item.id); setActiveGroupName(g?.name || ''); setActiveGroupExpiry(g?.expiresAt || null); await refreshCombined(item.id); }} />
               <Button title="Invite" onPress={async () => { const key = await getGroupKey(item.id); if (!key) { Alert.alert('Missing key', 'No group key found on this device'); return; } const link = buildInviteURL({ gid: item.id, name: item.name, type: item.type, exp: item.expiresAt || undefined, key }); setInviteLink(link); setShowQR(link); }} />
               <Button title="Share My Profile" onPress={async () => {
                 if (!profile) return Alert.alert('Complete profile first');
@@ -152,6 +155,25 @@ export default function Groups() {
       {!!activeGroupId && (
         <>
           <Text style={styles.sub}>Combined Profile: {combinedSummary}</Text>
+          {activeGroupExpiry && (
+            <Text style={styles.sub}>Expires: {new Date(activeGroupExpiry).toLocaleString()}</Text>
+          )}
+          {activeGroupExpiry && (
+            <View style={{ marginTop: 8 }}>
+              <Text style={styles.label}>Extend expiry (days)</Text>
+              <Input value={extendDays} onChangeText={setExtendDays} keyboardType="number-pad" />
+              <View style={{ height: 8 }} />
+              <Button title="Extend" onPress={async () => {
+                if (!activeGroupId || !activeGroupExpiry) return;
+                const newDate = new Date(activeGroupExpiry);
+                newDate.setDate(newDate.getDate() + (Number(extendDays) || 7));
+                await updateGroupExpiry(activeGroupId, newDate.toISOString());
+                const g = await getGroupById(activeGroupId);
+                setActiveGroupExpiry(g?.expiresAt || null);
+                Alert.alert('Extended', 'Group expiry updated');
+              }} />
+            </View>
+          )}
         </>
       )}
       {!!activeGroupId && (

@@ -5,6 +5,8 @@ import { useApp } from '@/state/AppContext';
 import { MAJOR_STORES } from '@/constants/stores';
 import { Button } from '@/ui/Button';
 import { SwitchRow } from '@/ui/SwitchRow';
+import * as Location from 'expo-location';
+import { setAppState, getAppState } from '@/db';
 
 export default function StoreSelection() {
   const { profile, setProfile } = useApp();
@@ -14,6 +16,7 @@ export default function StoreSelection() {
     return init;
   });
   const [multiStore, setMultiStore] = useState(false);
+  const [locStatus, setLocStatus] = useState<string>('');
 
   const onContinue = async () => {
     const chosen = Object.entries(selected)
@@ -22,6 +25,26 @@ export default function StoreSelection() {
     await setProfile({ ...(profile as any), preferredStores: chosen });
     router.push('/(main)/home');
   };
+
+  // Request location once to align with PRD (suggest nearby stores later)
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const asked = await getAppState('loc_permission');
+        if (asked === 'granted' || asked === 'denied') { setLocStatus(asked); return; }
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') { setLocStatus('denied'); await setAppState('loc_permission', 'denied'); return; }
+        const pos = await Location.getCurrentPositionAsync({});
+        await setAppState('loc_permission', 'granted');
+        await setAppState('loc_lat', String(pos.coords.latitude));
+        await setAppState('loc_lon', String(pos.coords.longitude));
+        await setAppState('loc_ts', String(Date.now()));
+        setLocStatus('granted');
+      } catch {
+        setLocStatus('error');
+      }
+    })();
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -36,6 +59,7 @@ export default function StoreSelection() {
       <SwitchRow label="Allow multi-store optimization" value={multiStore} onValueChange={setMultiStore} />
       <View style={{ height: 10 }} />
       <Button title="Continue" onPress={onContinue} />
+      {!!locStatus && <Text style={{ color: '#666', marginTop: 8 }}>Location: {locStatus}</Text>}
     </View>
   );
 }

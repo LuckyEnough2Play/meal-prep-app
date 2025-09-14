@@ -16,6 +16,7 @@ export default function Plan() {
   const [perStore, setPerStore] = useState<Array<{ storeId: string; storeName: string; cost: number; unknown: string[] }>>([]);
   const [unknownCount, setUnknownCount] = useState<number>(0);
   const [potentialSavings, setPotentialSavings] = useState<string>('');
+  const [budgetVariance, setBudgetVariance] = useState<string>('');
 
   const onCreate = async () => {
     if (!profile) return Alert.alert('Complete profile first');
@@ -80,6 +81,16 @@ export default function Plan() {
     } else {
       setPotentialSavings('');
     }
+    // Weekly budget variance (compare one-store estimate)
+    const weeklyBudget = profile?.weeklyBudget || 0;
+    if (weeklyBudget > 0 && one.oneStoreBest) {
+      const diff = weeklyBudget - one.oneStoreBest.cost;
+      if (Math.abs(diff) < 0.01) setBudgetVariance('At budget');
+      else if (diff > 0) setBudgetVariance(`Under budget by $${diff.toFixed(2)}`);
+      else setBudgetVariance(`Over budget by $${Math.abs(diff).toFixed(2)}`);
+    } else {
+      setBudgetVariance('');
+    }
   };
 
   useEffect(() => { refreshSummary(); }, []);
@@ -105,6 +116,7 @@ export default function Plan() {
       <Text style={styles.subtitle}>Active Plan Summary</Text>
       <Text style={styles.summary}>{summary}</Text>
       {!!potentialSavings && <Text style={[styles.summary, { color: '#059669' }]}>{potentialSavings}</Text>}
+      {!!budgetVariance && <Text style={[styles.summary, { color: budgetVariance.startsWith('Over') ? '#DC2626' : '#059669' }]}>{budgetVariance}</Text>}
       <View style={{ height: 8 }} />
       <Text style={styles.subtitle}>Cost by Store</Text>
       <FlatList

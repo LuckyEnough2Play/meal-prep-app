@@ -73,6 +73,9 @@ export default function Meals() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Meal Discovery</Text>
+      {recipes.length === 0 ? (
+        <Text style={{ color: '#666' }}>No compatible recipes. Adjust your profile or group constraints.</Text>
+      ) : (
       <FlatList
         data={recipes}
         keyExtractor={(i) => i.id}
@@ -93,6 +96,7 @@ export default function Meals() {
           </Card>
         )}
       />
+      )}
     </View>
   );
 }
