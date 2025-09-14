@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, FlatList, RefreshControl } from 'react-native';
-import { getActivePlan, listShoppingItems, toggleShoppingItemChecked } from '@/db';
-import * as SQLite from 'expo-sqlite';
+import { getActivePlan, listShoppingItems, toggleShoppingItemChecked, getStoreNamesMap } from '@/db';
 import { useApp } from '@/state/AppContext';
 
 export default function List() {
@@ -17,18 +16,8 @@ export default function List() {
     setPlanId(ap?.id ?? null);
     const data = ap ? await listShoppingItems(ap.id) : [];
     setItems(data);
-    // Load store names
-    try {
-      const db = SQLite.openDatabase('marble.db');
-      await new Promise<void>((resolve) => db.readTransaction((tx) => {
-        tx.executeSql('SELECT id,name FROM store', [], (_tx, rs) => {
-          const map: Record<string, string> = {};
-          for (const r of (rs.rows as any)._array || []) map[r.id] = r.name;
-          setStoreNames(map);
-          resolve();
-        });
-      }));
-    } catch {}
+    // Load store names via DB helper
+    try { setStoreNames(await getStoreNamesMap()); } catch {}
     setRefreshing(false);
   };
 

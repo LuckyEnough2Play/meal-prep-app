@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import type { Plan, Recipe, ShoppingListItem, UserProfile } from '@/models/types';
+import { includesNormalized, canonicalizeName } from '@/utils/strings';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -313,7 +314,7 @@ export async function estimateRecipeCost(recipe: Recipe, servings: number, store
     let cost = 0;
     const unknown: string[] = [];
     for (const need of scaled) {
-      const match = items.find((it) => it.name.toLowerCase().includes(need.name.toLowerCase()));
+      const match = items.find((it) => includesNormalized(it.name, need.name));
       if (!match) {
         unknown.push(need.name);
         continue;
@@ -341,7 +342,7 @@ export async function estimateRecipeCost(recipe: Recipe, servings: number, store
       let found = false;
       for (const sid of storeIds) {
         const items = itemsByStore[sid] || [];
-        const match = items.find((it) => it.name.toLowerCase().includes(need.name.toLowerCase()));
+        const match = items.find((it) => includesNormalized(it.name, need.name));
         if (match) {
           const pack = match.packageSize || 1;
           const packsNeeded = Math.ceil((need.qty || 0) / pack);
@@ -415,7 +416,7 @@ export async function assignStoresForPlanItems(planId: string, storeIds: string[
   for (const it of items) {
     let storeId: string | undefined = defaultStore;
     if (storeMode === 'multi' && est.suggestions) {
-      const s = est.suggestions.find((x) => x.name.toLowerCase().includes(it.name.toLowerCase()));
+      const s = est.suggestions.find((x) => includesNormalized(x.name, it.name));
       if (s?.bestStoreId) storeId = s.bestStoreId;
     }
     if (storeId && it.storeId !== storeId) {
@@ -531,7 +532,9 @@ export async function appendMealToPlan(planId: string, meal: { recipeId: string;
 export async function addOrMergeShoppingItems(planId: string, items: Omit<ShoppingListItem, 'id' | 'checkedBy'>[]) {
   const existing = await listShoppingItems(planId);
   for (const it of items) {
-    const match = existing.find((e) => e.name.toLowerCase() === (it.name || '').toLowerCase() && (e.unit || '') === (it.unit || ''));
+    const itName = canonicalizeName(it.name || '');
+    const itUnit = (it.unit || '').toLowerCase();
+    const match = existing.find((e) => canonicalizeName(e.name) === itName && (e.unit || '').toLowerCase() === itUnit);
     if (match) {
       const newQty = (match.qty || 0) + (it.qty || 0);
       await run(`UPDATE shopping_list_item SET qty = ? WHERE id = ?`, [newQty, match.id]);
@@ -555,4 +558,11 @@ export async function toggleShoppingItemChecked(itemId: string, userId: string):
   const has = current.includes(userId);
   const next = has ? current.filter((x: string) => x !== userId) : [...current, userId];
   await run(`UPDATE shopping_list_item SET checked_by = ? WHERE id = ?`, [JSON.stringify(next), itemId]);
+}
+
+export async function getStoreNamesMap(): Promise<Record<string, string>> {
+  const rs = await run<SQLite.SQLResultSet>(`SELECT id, name FROM store`);
+  const map: Record<string, string> = {};
+  for (const r of (rs.rows as any)._array || []) map[r.id] = r.name;
+  return map;
 }

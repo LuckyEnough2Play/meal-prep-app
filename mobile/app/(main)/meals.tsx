@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Alert } from 'react-native';
 import { useApp } from '@/state/AppContext';
-import { appendMealToPlan, addOrMergeShoppingItems, estimateRecipeCost, getActivePlan, listRecipes, seedRecipesIfEmpty } from '@/db';
+import { appendMealToPlan, addOrMergeShoppingItems, estimateRecipeCost, getActivePlan, listRecipes, seedRecipesIfEmpty, upsertPlan, setActivePlan, assignStoresForPlanItems } from '@/db';
 import { STARTER_RECIPES } from '@/data/recipes';
 import { evaluateCompatibility } from '@/features/recipes/compatibility';
 import type { Recipe } from '@/models/types';
@@ -34,7 +34,6 @@ export default function Meals() {
     let ap = await getActivePlan();
     if (!ap) {
       // Ensure there is an active plan
-      const { upsertPlan, setActivePlan } = await import('@/db');
       const now = new Date();
       const id = `plan-${Date.now()}`;
       await upsertPlan({
@@ -60,7 +59,6 @@ export default function Meals() {
     await addOrMergeShoppingItems(ap.id, items);
     // Assign stores according to plan mode
     const stores = profile?.preferredStores || [];
-    const { assignStoresForPlanItems } = await import('@/db');
     await assignStoresForPlanItems(ap.id, stores, ap.storeMode);
     Alert.alert('Added', `${r.name} x ${s} added to plan and list.`);
   };
@@ -114,7 +112,6 @@ function CostEstimate({ recipe, servings }: { recipe: Recipe; servings: number }
         setText('Select stores to see savings');
         return;
       }
-      const { getActivePlan } = await import('@/db');
       const ap = await getActivePlan();
       const est = await estimateRecipeCost(recipe, servings, stores, 'one');
       if (!est.oneStoreBest) {
