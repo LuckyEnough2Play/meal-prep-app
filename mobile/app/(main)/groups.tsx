@@ -19,6 +19,7 @@ export default function Groups() {
   const [groups, setGroups] = useState<GroupRow[]>([]);
   const [name, setName] = useState('My Group');
   const [isEvent, setIsEvent] = useState(false);
+  const [expiryDays, setExpiryDays] = useState('7');
   const [showQR, setShowQR] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -50,7 +51,8 @@ export default function Groups() {
 
   const onCreate = async () => {
     if (!profile) return Alert.alert('Complete profile first');
-    const g = await createGroup({ name, type: isEvent ? 'event' : 'static', createdBy: profile.id });
+    const exp = isEvent ? new Date(Date.now() + (Number(expiryDays) || 7) * 86400000).toISOString() : undefined;
+    const g = await createGroup({ name, type: isEvent ? 'event' : 'static', createdBy: profile.id, expiresAt: exp });
     // Generate group key (hex) and store in SecureStore
     const bytes = await Crypto.getRandomBytesAsync(32);
     const keyHex = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -113,6 +115,12 @@ export default function Groups() {
       <Text style={styles.label}>Group name</Text>
       <Input value={name} onChangeText={setName} />
       <SwitchRow label="Event group (expires)" value={isEvent} onValueChange={setIsEvent} />
+      {isEvent && (
+        <View style={{ marginTop: 8 }}>
+          <Text style={styles.label}>Days until expiry</Text>
+          <Input value={expiryDays} onChangeText={setExpiryDays} keyboardType="number-pad" />
+        </View>
+      )}
       <View style={{ height: 8 }} />
       <Button title="Create & Invite" onPress={onCreate} />
 
@@ -141,6 +149,11 @@ export default function Groups() {
       <View style={{ height: 16 }} />
       <Text style={styles.subtitle}>Active Group</Text>
       <Text style={styles.sub}>{activeGroupId ? `Active: ${activeGroupName || activeGroupId}` : 'None selected'}</Text>
+      {!!activeGroupId && (
+        <>
+          <Text style={styles.sub}>Combined Profile: {combinedSummary}</Text>
+        </>
+      )}
       {!!activeGroupId && (
         <>
           <Text style={styles.sub}>Combined Profile: {combinedSummary}</Text>

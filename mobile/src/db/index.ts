@@ -326,6 +326,7 @@ export async function seedSamplePrices(): Promise<void> {
   for (const s of seeds) {
     await ensureStore(s.storeId, s.storeName);
     for (const it of s.items) await upsertStoreItem(s.storeId, it);
+    await run(`UPDATE store SET last_price_refresh = ? WHERE id = ?`, [Date.now(), s.storeId]);
   }
 }
 

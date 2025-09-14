@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Switch, FlatList, Alert, ScrollView } from 'react-native';
 import { MAJOR_STORES } from '@/constants/stores';
-import { ensureStore, listStoreItems, seedSamplePrices, upsertStoreItem, listAliasesForStore, upsertAlias } from '@/db';
+import { ensureStore, listStoreItems, seedSamplePrices, upsertStoreItem, listAliasesForStore, upsertAlias, getStoreById } from '@/db';
 import { Input } from '@/ui/Input';
 import { Button } from '@/ui/Button';
 
@@ -17,12 +17,15 @@ export default function Prices() {
   const [aliasFilter, setAliasFilter] = useState('');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [aliases, setAliases] = useState<Array<{ alias: string; targetItemId: string }>>([]);
+  const [lastUpdated, setLastUpdated] = useState<string>('');
 
   const load = async (sid = storeId) => {
     await ensureStore(sid, (MAJOR_STORES.find((s) => s.id === sid)?.name || sid));
     const data = await listStoreItems(sid);
     setItems(data);
     setAliases(await listAliasesForStore(sid));
+    const st = await getStoreById(sid);
+    if (st?.lastPriceRefresh) setLastUpdated(new Date(st.lastPriceRefresh).toLocaleString()); else setLastUpdated('—');
   };
 
   useEffect(() => {
@@ -68,6 +71,7 @@ export default function Prices() {
       </View>
 
       <Button title="Seed Sample Prices" onPress={onSeed} />
+      <Text style={{ marginTop: 6, color: '#666' }}>Last updated: {lastUpdated}</Text>
 
       <Text style={styles.section}>Add Item</Text>
       <View style={styles.formRow}><Input placeholder="Name" value={name} onChangeText={setName} /></View>

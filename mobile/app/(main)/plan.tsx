@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Switch, Alert, FlatList } from 'react-native';
 import { useApp } from '@/state/AppContext';
-import { upsertPlan, setActivePlan, addShoppingItems, getActivePlan, estimatePlanCost, assignStoresForPlanItems } from '@/db';
+import { upsertPlan, setActivePlan, addShoppingItems, getActivePlan, estimatePlanCost, assignStoresForPlanItems, updatePlanFields } from '@/db';
 import { Button } from '@/ui/Button';
 import { Input } from '@/ui/Input';
 import { SwitchRow } from '@/ui/SwitchRow';
@@ -13,6 +13,9 @@ export default function Plan() {
   const [multi, setMulti] = useState(false);
   const [budget, setBudget] = useState('');
   const [summary, setSummary] = useState<string>('');
+  const [perStore, setPerStore] = useState<Array<{ storeId: string; storeName: string; cost: number; unknown: string[] }>>([]);
+  const [unknownCount, setUnknownCount] = useState<number>(0);
+  const [potentialSavings, setPotentialSavings] = useState<string>('');
 
   const onCreate = async () => {
     if (!profile) return Alert.alert('Complete profile first');
@@ -65,6 +68,18 @@ export default function Plan() {
     const unk = one.oneStoreBest?.unknown?.length || 0;
     if (unk) line += ` • ${unk} unknown`;
     setSummary(line);
+    setPerStore(one.perStore || []);
+    setUnknownCount(unk);
+    // compute potential savings if switching to multi
+    if (stores.length > 1 && one.oneStoreBest) {
+      const multiEst = await estimatePlanCost(ap.id, stores, 'multi');
+      if (multiEst.multiStore) {
+        const delta = one.oneStoreBest.cost - multiEst.multiStore.cost;
+        setPotentialSavings(delta > 0.01 ? `Switching to multi-store saves ~$${delta.toFixed(2)}` : '');
+      }
+    } else {
+      setPotentialSavings('');
+    }
   };
 
   useEffect(() => { refreshSummary(); }, []);
@@ -89,6 +104,30 @@ export default function Plan() {
       <View style={{ height: 16 }} />
       <Text style={styles.subtitle}>Active Plan Summary</Text>
       <Text style={styles.summary}>{summary}</Text>
+      {!!potentialSavings && <Text style={[styles.summary, { color: '#059669' }]}>{potentialSavings}</Text>}
+      <View style={{ height: 8 }} />
+      <Text style={styles.subtitle}>Cost by Store</Text>
+      <FlatList
+        data={perStore}
+        keyExtractor={(s) => s.storeId}
+        renderItem={({ item }) => (
+          <View style={styles.breakRow}>
+            <Text style={{ fontWeight: '600' }}>{item.storeName}</Text>
+            <Text>${item.cost.toFixed(2)}{item.unknown.length ? ` • ${item.unknown.length} unknown` : ''}</Text>
+          </View>
+        )}
+      />
+      <View style={{ height: 8 }} />
+      <SwitchRow label="Use multi-store optimization" value={multi} onValueChange={setMulti} />
+      <Button title="Apply to Active Plan" onPress={async () => {
+        const ap = await getActivePlan();
+        if (!ap) return Alert.alert('No active plan');
+        await updatePlanFields(ap.id, { storeMode: multi ? 'multi' : 'one' });
+        const stores = profile?.preferredStores || [];
+        await assignStoresForPlanItems(ap.id, stores, multi ? 'multi' : 'one');
+        await refreshSummary();
+        Alert.alert('Updated', `Store mode set to ${multi ? 'multi' : 'one'}`);
+      }} />
       <View style={{ height: 8 }} />
       <Button title="Assign stores to list items" onPress={async () => {
         const ap = await getActivePlan();
