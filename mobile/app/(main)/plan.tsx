@@ -160,7 +160,25 @@ export default function Plan() {
           {suggestions.map((s, idx) => (
             <View key={idx} style={styles.breakRow}>
               <Text>{s.name}</Text>
-              <Text>{s.storeName ? `Buy at ${s.storeName}` : 'No match'}{s.estCost ? ` • ~$${s.estCost.toFixed(2)}` : ''}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text>{s.storeName ? `Buy at ${s.storeName}` : 'No match'}{s.estCost ? ` • ~$${s.estCost.toFixed(2)}` : ''}</Text>
+                {!!s.storeName && (
+                  <Button title="Map" onPress={async () => {
+                    const ap = await getActivePlan();
+                    if (!ap) return;
+                    // @ts-ignore
+                    const sid = (s as any).bestStoreId as string | undefined;
+                    // @ts-ignore
+                    const itemId = (s as any).bestItemId as string | undefined;
+                    if (!sid || !itemId) return Alert.alert('Unavailable', 'No store item found to map.');
+                    const { applyAliasToPlanItems } = await import('@/db');
+                    await applyAliasToPlanItems(ap.id, s.name, sid, itemId);
+                    await assignStoresForPlanItems(ap.id, profile?.preferredStores || [], 'multi');
+                    await refreshSummary();
+                    Alert.alert('Mapped', `Mapped "${s.name}" to ${s.storeName}.`);
+                  }} />
+                )}
+              </View>
             </View>
           ))}
         </>
@@ -189,4 +207,3 @@ const styles = StyleSheet.create({
   summary: { fontSize: 14, color: '#0a7', marginTop: 6 },
   breakRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }
 });
-

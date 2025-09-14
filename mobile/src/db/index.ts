@@ -334,7 +334,7 @@ export type EstimateResult = {
   perStore: Array<{ storeId: string; storeName: string; cost: number; unknown: string[] }>;
   oneStoreBest?: { storeId: string; storeName: string; cost: number; unknown: string[] };
   multiStore?: { cost: number; unknown: string[] };
-  suggestions?: Array<{ name: string; bestStoreId?: string; bestStoreName?: string; estCost?: number }>;
+  suggestions?: Array<{ name: string; bestStoreId?: string; bestStoreName?: string; bestItemId?: string; estCost?: number }>;
 };
 
 export async function estimateRecipeCost(recipe: Recipe, servings: number, storeIds: string[], storeMode: 'one' | 'multi'): Promise<EstimateResult> {
@@ -394,6 +394,7 @@ export async function estimateRecipeCost(recipe: Recipe, servings: number, store
     for (const need of scaled) {
       let best = Infinity;
       let bestStore: string | undefined;
+      let bestItemId: string | undefined;
       let found = false;
       for (const sid of storeIds) {
         const items = itemsByStore[sid] || [];
@@ -405,13 +406,13 @@ export async function estimateRecipeCost(recipe: Recipe, servings: number, store
           const pack = match.packageSize || 1;
           const packsNeeded = Math.ceil((need.qty || 0) / pack);
           const c = packsNeeded * (match.price || 0);
-          if (c < best) { best = c; bestStore = sid; }
+          if (c < best) { best = c; bestStore = sid; bestItemId = match.id; }
           found = true;
         }
       }
       if (found) {
         cost += best;
-        suggestions?.push({ name: need.name, bestStoreId: bestStore, bestStoreName: storeNames[bestStore || ''], estCost: best });
+        suggestions?.push({ name: need.name, bestStoreId: bestStore, bestItemId, bestStoreName: storeNames[bestStore || ''], estCost: best });
       } else {
         unknown.push(need.name);
         suggestions?.push({ name: need.name });
@@ -478,6 +479,20 @@ export async function assignStoresForPlanItems(planId: string, storeIds: string[
       if (s?.bestStoreId) storeId = s.bestStoreId;
     }
     if (storeId && it.storeId !== storeId) {
+      await run(`UPDATE shopping_list_item SET store_id = ? WHERE id = ?`, [storeId, it.id]);
+    }
+  }
+}
+export async function applyAliasToPlanItems(planId: string, aliasName: string, storeId: string, targetItemId: string): Promise<void> {
+  const alias = canonicalizeName(aliasName);
+  await run(
+    `INSERT INTO alias_map (alias, store_id, target_item_id) VALUES (?, ?, ?)
+     ON CONFLICT(alias, store_id) DO UPDATE SET target_item_id = excluded.target_item_id`,
+    [alias, storeId, targetItemId]
+  );
+  const items = await listShoppingItems(planId);
+  for (const it of items) {
+    if (includesNormalized(it.name, aliasName)) {
       await run(`UPDATE shopping_list_item SET store_id = ? WHERE id = ?`, [storeId, it.id]);
     }
   }
