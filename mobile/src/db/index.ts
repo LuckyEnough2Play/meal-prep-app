@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import type { UserProfile } from '@/models/types';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -77,3 +78,65 @@ export function initDb() {
   ], false, () => {});
 }
 
+function run<T = void>(sql: string, args: any[] = []): Promise<T> {
+  const dbi = getDb();
+  return new Promise((resolve, reject) => {
+    dbi.transaction(
+      (tx) => {
+        tx.executeSql(
+          sql,
+          args,
+          (_tx, result) => resolve((result as unknown) as T),
+          (_tx, err) => {
+            reject(err);
+            return true;
+          }
+        );
+      },
+      (err) => reject(err)
+    );
+  });
+}
+
+export async function saveUserProfile(p: UserProfile): Promise<void> {
+  const diet = JSON.stringify(p.dietTypes || []);
+  const allergies = JSON.stringify(p.allergies || []);
+  const dislikes = JSON.stringify(p.dislikes || []);
+  const stores = JSON.stringify(p.preferredStores || []);
+  await run(
+    `INSERT INTO user_profile (id, name, diet_types, allergies, dislikes, weekly_budget, preferred_stores)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       name=excluded.name,
+       diet_types=excluded.diet_types,
+       allergies=excluded.allergies,
+       dislikes=excluded.dislikes,
+       weekly_budget=excluded.weekly_budget,
+       preferred_stores=excluded.preferred_stores`,
+    [p.id, p.name, diet, allergies, dislikes, p.weeklyBudget ?? 0, stores]
+  );
+}
+
+export async function loadUserProfile(): Promise<UserProfile | null> {
+  const res = await run<SQLite.SQLResultSet>(`SELECT * FROM user_profile LIMIT 1`, []);
+  const row = (res.rows as any)._array?.[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    dietTypes: safeParseArray(row.diet_types),
+    allergies: safeParseArray(row.allergies),
+    dislikes: safeParseArray(row.dislikes),
+    weeklyBudget: Number(row.weekly_budget || 0),
+    preferredStores: safeParseArray(row.preferred_stores)
+  } as UserProfile;
+}
+
+function safeParseArray(v: any): string[] {
+  try {
+    const parsed = JSON.parse(String(v ?? '[]'));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}

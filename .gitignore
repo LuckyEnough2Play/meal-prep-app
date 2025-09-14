@@ -19,3 +19,16 @@ pnpm-debug.log*
 # legacy directories (removed)
 frontend/
 supabase/
+
+# Expo / React Native (mobile)
+mobile/.expo/
+mobile/.expo-shared/
+mobile/node_modules/
+mobile/dist/
+mobile/android/
+mobile/ios/
+mobile/**/*.keystore
+mobile/**/*.jks
+mobile/**/*.p8
+mobile/**/*.mobileprovision
+mobile/expo-debug.log

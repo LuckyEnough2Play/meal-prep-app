@@ -13,11 +13,11 @@ export default function StoreSelection() {
   });
   const [multiStore, setMultiStore] = useState(false);
 
-  const onContinue = () => {
+  const onContinue = async () => {
     const chosen = Object.entries(selected)
       .filter(([, v]) => v)
       .map(([k]) => k);
-    setProfile({ ...(profile as any), preferredStores: chosen });
+    await setProfile({ ...(profile as any), preferredStores: chosen });
     router.push('/(main)/home');
   };
 
@@ -53,4 +53,3 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 16 }
 });
-

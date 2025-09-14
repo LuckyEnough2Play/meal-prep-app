@@ -11,8 +11,8 @@ export default function ProfileSetup() {
   const [allergies, setAllergies] = useState<string>('');
   const [dislikes, setDislikes] = useState<string>('');
 
-  const onSave = () => {
-    setProfile({
+  const onSave = async () => {
+    await setProfile({
       id: 'local-user',
       name,
       dietTypes: dietTypes.split(',').map((s) => s.trim()).filter(Boolean),
@@ -69,4 +69,3 @@ const styles = StyleSheet.create({
     marginBottom: 12
   }
 });
-
