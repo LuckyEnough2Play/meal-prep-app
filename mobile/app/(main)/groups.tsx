@@ -4,10 +4,11 @@ import { useApp } from '@/state/AppContext';
 import { Button } from '@/ui/Button';
 import { Input } from '@/ui/Input';
 import { SwitchRow } from '@/ui/SwitchRow';
-import { createGroup, listGroups, type GroupRow, upsertGroupFromInvite } from '@/db';
+import { createGroup, listGroups, type GroupRow, upsertGroupFromInvite, addProfileCardToGroup, listProfileCards, computeCombinedProfile, setAppState, getAppState, getGroupById } from '@/db';
 import { setGroupKey, getGroupKey } from '@/storage/secure';
 import * as Crypto from 'expo-crypto';
 import { buildInviteURL, parseInviteURL } from '@/sync/invite';
+import { buildProfileShareURL, parseProfileShareURL } from '@/sync/profileShare';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { BarCodeScanner } from 'expo-barcode-scanner';
@@ -22,8 +23,20 @@ export default function Groups() {
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [combinedSummary, setCombinedSummary] = useState<string>('');
+  const [activeGroupName, setActiveGroupName] = useState<string>('');
 
-  const load = async () => { setGroups(await listGroups()); };
+  const load = async () => {
+    setGroups(await listGroups());
+    const ag = await getAppState('active_group_id');
+    setActiveGroupId(ag);
+    if (ag) {
+      const g = await getGroupById(ag);
+      setActiveGroupName(g?.name || '');
+      await refreshCombined(ag);
+    }
+  };
   useEffect(() => { load(); }, []);
   useEffect(() => {
     const sub = Linking.addEventListener('url', async (e) => {
@@ -58,7 +71,9 @@ export default function Groups() {
 
   const onBarCodeScanned = async ({ data }: { data: string }) => {
     setScanning(false);
-    await handleInvite(data);
+    // Try group invite first, then profile share
+    if (data.includes('marble://invite')) await handleInvite(data);
+    else if (data.includes('marble://profile')) await handleProfileShare(data);
   };
 
   const handleInvite = async (url: string) => {
@@ -68,6 +83,26 @@ export default function Groups() {
     await setGroupKey(parsed.gid, parsed.key);
     await load();
     Alert.alert('Joined', `You joined group: ${parsed.name}`);
+  };
+
+  const handleProfileShare = async (url: string) => {
+    const parsed = parseProfileShareURL(url);
+    if (!parsed) return Alert.alert('Invalid profile card');
+    if (!activeGroupId || parsed.gid !== activeGroupId) {
+      return Alert.alert('Wrong group', 'Select the correct active group before scanning profile cards.');
+    }
+    await addProfileCardToGroup(parsed.gid, { name: parsed.name, dietTypes: parsed.dietTypes || [], allergies: parsed.allergies || [], dislikes: parsed.dislikes || [] });
+    await refreshCombined(parsed.gid);
+    Alert.alert('Added', `Profile card added to group.`);
+  };
+
+  const refreshCombined = async (gid: string) => {
+    const comb = await computeCombinedProfile(gid);
+    if (!comb) { setCombinedSummary('No cards yet'); return; }
+    const diets = (comb.dietTypes || []).join(', ') || '—';
+    const alls = (comb.allergies || []).join(', ') || '—';
+    const dls = (comb.dislikes || []).join(', ') || '—';
+    setCombinedSummary(`Diet: ${diets} • Allergies: ${alls} • Dislikes: ${dls}`);
   };
 
   return (
@@ -90,13 +125,29 @@ export default function Groups() {
           <View style={styles.groupRow}>
             <Text style={styles.groupName}>{item.name}</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Button title={activeGroupId === item.id ? 'Active' : 'Set Active'} onPress={async () => { await setAppState('active_group_id', item.id); setActiveGroupId(item.id); const g = await getGroupById(item.id); setActiveGroupName(g?.name || ''); await refreshCombined(item.id); }} />
               <Button title="Invite" onPress={async () => { const key = await getGroupKey(item.id); if (!key) { Alert.alert('Missing key', 'No group key found on this device'); return; } const link = buildInviteURL({ gid: item.id, name: item.name, type: item.type, exp: item.expiresAt || undefined, key }); setInviteLink(link); setShowQR(link); }} />
+              <Button title="Share My Profile" onPress={async () => {
+                if (!profile) return Alert.alert('Complete profile first');
+                const link = buildProfileShareURL({ gid: item.id, name: profile.name, dietTypes: (profile.dietTypes as any[]) || [], allergies: profile.allergies || [], dislikes: profile.dislikes || [] });
+                setShowQR(link);
+              }} />
+              <Button title="Scan Profile" onPress={startScan} />
             </View>
           </View>
         )}
       />
 
       <View style={{ height: 16 }} />
+      <Text style={styles.subtitle}>Active Group</Text>
+      <Text style={styles.sub}>{activeGroupId ? `Active: ${activeGroupName || activeGroupId}` : 'None selected'}</Text>
+      {!!activeGroupId && (
+        <>
+          <Text style={styles.sub}>Combined Profile: {combinedSummary}</Text>
+        </>
+      )}
+
+      <View style={{ height: 12 }} />
       <Text style={styles.subtitle}>Join Group</Text>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Button title="Scan QR" onPress={startScan} />

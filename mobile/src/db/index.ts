@@ -104,6 +104,26 @@ export function initDb() {
       args: []
     },
     {
+      sql: `CREATE TABLE IF NOT EXISTS group_profile_card (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL,
+        name TEXT,
+        diet_types TEXT,
+        allergies TEXT,
+        dislikes TEXT,
+        created_at INTEGER,
+        FOREIGN KEY (group_id) REFERENCES grp(id) ON DELETE CASCADE
+      );`,
+      args: []
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS app_state (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );`,
+      args: []
+    },
+    {
       sql: `CREATE TABLE IF NOT EXISTS alias_map (
         alias TEXT NOT NULL,
         store_id TEXT,
@@ -625,4 +645,63 @@ export async function upsertGroupFromInvite(grp: GroupRow): Promise<void> {
      ON CONFLICT(id) DO UPDATE SET name=excluded.name, type=excluded.type, expires_at=excluded.expires_at`,
     [grp.id, grp.name, grp.type, grp.expiresAt ?? null, grp.createdBy ?? null]
   );
+}
+
+export async function getGroupById(groupId: string): Promise<GroupRow | null> {
+  const rs = await run<SQLite.SQLResultSet>(`SELECT * FROM grp WHERE id = ?`, [groupId]);
+  const r = (rs.rows as any)._array?.[0];
+  if (!r) return null;
+  return { id: r.id, name: r.name, type: r.type, expiresAt: r.expires_at ?? null, createdBy: r.created_by ?? null };
+}
+
+// Group profile cards
+export type ProfileCard = { id: string; groupId: string; name?: string; dietTypes: string[]; allergies: string[]; dislikes: string[]; createdAt: number };
+
+export async function addProfileCardToGroup(groupId: string, card: Omit<ProfileCard, 'id' | 'groupId' | 'createdAt'> & { name?: string }): Promise<string> {
+  const id = `pc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  await run(
+    `INSERT INTO group_profile_card (id, group_id, name, diet_types, allergies, dislikes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, groupId, card.name ?? null, JSON.stringify(card.dietTypes || []), JSON.stringify(card.allergies || []), JSON.stringify(card.dislikes || []), Date.now()]
+  );
+  return id;
+}
+
+export async function listProfileCards(groupId: string): Promise<ProfileCard[]> {
+  const rs = await run<SQLite.SQLResultSet>(`SELECT * FROM group_profile_card WHERE group_id = ? ORDER BY created_at DESC`, [groupId]);
+  const arr = (rs.rows as any)._array as any[];
+  return arr.map((r) => ({ id: r.id, groupId: r.group_id, name: r.name ?? undefined, dietTypes: safeParseArray(r.diet_types), allergies: safeParseArray(r.allergies), dislikes: safeParseArray(r.dislikes), createdAt: Number(r.created_at || 0) }));
+}
+
+export async function computeCombinedProfile(groupId: string): Promise<{ name: string; dietTypes: string[]; allergies: string[]; dislikes: string[] } | null> {
+  const cards = await listProfileCards(groupId);
+  if (cards.length === 0) return null;
+  // Allergies: union across members (any allergen excludes)
+  const allergiesSet = new Set<string>();
+  for (const c of cards) for (const a of c.allergies || []) allergiesSet.add(String(a).toLowerCase());
+  // Dislikes: union
+  const dislikesSet = new Set<string>();
+  for (const c of cards) for (const d of c.dislikes || []) dislikesSet.add(String(d).toLowerCase());
+  // Diet types: intersection; if empty, leave empty (no hard restriction)
+  let intersection: Set<string> | null = null;
+  for (const c of cards) {
+    const ds = new Set((c.dietTypes || []).map((x) => String(x).toLowerCase()));
+    if (intersection === null) intersection = ds; else intersection = new Set([...intersection].filter((x) => ds.has(x)));
+  }
+  const dietTypes = intersection ? [...intersection] : [];
+  return { name: 'Group Combined', dietTypes, allergies: [...allergiesSet], dislikes: [...dislikesSet] };
+}
+
+// App state
+export async function setAppState(key: string, value: string | null): Promise<void> {
+  if (value === null) {
+    await run(`DELETE FROM app_state WHERE key = ?`, [key]);
+  } else {
+    await run(`INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [key, value]);
+  }
+}
+
+export async function getAppState(key: string): Promise<string | null> {
+  const rs = await run<SQLite.SQLResultSet>(`SELECT value FROM app_state WHERE key = ?`, [key]);
+  const r = (rs.rows as any)._array?.[0];
+  return r ? String(r.value) : null;
 }

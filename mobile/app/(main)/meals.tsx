@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Alert } from 'react-native';
 import { useApp } from '@/state/AppContext';
-import { appendMealToPlan, addOrMergeShoppingItems, estimateRecipeCost, getActivePlan, listRecipes, seedRecipesIfEmpty, upsertPlan, setActivePlan, assignStoresForPlanItems } from '@/db';
+import { appendMealToPlan, addOrMergeShoppingItems, estimateRecipeCost, getActivePlan, listRecipes, seedRecipesIfEmpty, upsertPlan, setActivePlan, assignStoresForPlanItems, getAppState, computeCombinedProfile } from '@/db';
 import { STARTER_RECIPES } from '@/data/recipes';
 import { evaluateCompatibility } from '@/features/recipes/compatibility';
 import type { Recipe } from '@/models/types';
@@ -16,9 +16,16 @@ export default function Meals() {
   const load = async () => {
     await seedRecipesIfEmpty(STARTER_RECIPES);
     const all = await listRecipes();
+    // Prefer combined group profile if an active group is set
+    let compatProfile = profile as any;
+    const activeGroupId = await getAppState('active_group_id');
+    if (activeGroupId) {
+      const comb = await computeCombinedProfile(activeGroupId);
+      if (comb) compatProfile = { id: `group-${activeGroupId}`, name: comb.name, dietTypes: comb.dietTypes, allergies: comb.allergies, dislikes: comb.dislikes, weeklyBudget: 0, preferredStores: profile?.preferredStores || [] };
+    }
     // Sort by compatibility descending, exclude hard excludes
     const withComp = all
-      .map((r) => ({ r, c: evaluateCompatibility(r, profile) }))
+      .map((r) => ({ r, c: evaluateCompatibility(r, compatProfile || null) }))
       .filter((x) => !x.c.hardExcluded)
       .sort((a, b) => b.c.score - a.c.score)
       .map((x) => x.r);
