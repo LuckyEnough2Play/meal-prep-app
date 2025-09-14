@@ -1,7 +1,17 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Switch, Alert, FlatList } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Switch, Alert, FlatList } from 'react-native';
 import { useApp } from '@/state/AppContext';
-import { upsertPlan, setActivePlan, addShoppingItems, getActivePlan, estimatePlanCost, assignStoresForPlanItems, updatePlanFields, getStoreNamesMap, refreshStoreNow } from '@/db';
+import {
+  upsertPlan,
+  setActivePlan,
+  addShoppingItems,
+  getActivePlan,
+  estimatePlanCost,
+  assignStoresForPlanItems,
+  updatePlanFields,
+  getStoreNamesMap,
+  refreshStoreNow
+} from '@/db';
 import { Button } from '@/ui/Button';
 import { Input } from '@/ui/Input';
 import { SwitchRow } from '@/ui/SwitchRow';
@@ -11,13 +21,22 @@ export default function Plan() {
   const [name, setName] = useState('My Plan');
   const [type, setType] = useState<'weekly' | 'event'>('weekly');
   const [multi, setMulti] = useState(false);
-  const [budget, setBudget] = useState('');
-  const [summary, setSummary] = useState<string>('');
-  const [perStore, setPerStore] = useState<Array<{ storeId: string; storeName: string; cost: number; unknown: string[] }>>([]);
-  const [unknownCount, setUnknownCount] = useState<number>(0);
-  const [potentialSavings, setPotentialSavings] = useState<string>('');
-  const [budgetVariance, setBudgetVariance] = useState<string>('');
+  const [planBudgetInput, setPlanBudgetInput] = useState('');
+
+  const [summary, setSummary] = useState('');
+  const [perStore, setPerStore] = useState<Array<{ storeId: string; storeName: string; cost: number; unknown: string[]; stale?: number }>>([]);
+  const [potentialSavings, setPotentialSavings] = useState('');
+  const [weeklyVariance, setWeeklyVariance] = useState('');
+  const [planVariance, setPlanVariance] = useState('');
   const [suggestions, setSuggestions] = useState<Array<{ name: string; storeName?: string; estCost?: number }>>([]);
+
+  useEffect(() => {
+    (async () => {
+      const ap = await getActivePlan();
+      if (ap?.budgetTarget != null) setPlanBudgetInput(String(ap.budgetTarget));
+      await refreshSummary();
+    })();
+  }, []);
 
   const onCreate = async () => {
     if (!profile) return Alert.alert('Complete profile first');
@@ -31,7 +50,7 @@ export default function Plan() {
       name,
       startDate: start.toISOString(),
       endDate: end.toISOString(),
-      budgetTarget: budget ? Number(budget) : undefined,
+      budgetTarget: planBudgetInput ? Number(planBudgetInput) : undefined,
       storeMode: multi ? 'multi' : 'one',
       meals: [],
       createdBy: profile.id,
@@ -42,7 +61,6 @@ export default function Plan() {
   };
 
   const onAddSampleItems = async () => {
-    const { getActivePlan } = await import('@/db');
     const ap = await getActivePlan();
     if (!ap) return Alert.alert('No active plan');
     await addShoppingItems(ap.id, [
@@ -57,55 +75,42 @@ export default function Plan() {
     const ap = await getActivePlan();
     if (!ap) { setSummary('No active plan'); return; }
     const stores = profile?.preferredStores || [];
-    if (stores.length === 0) { setSummary('Select stores in onboarding'); return; }
+    if (!stores.length) { setSummary('Select stores in onboarding'); return; }
+
     const one = await estimatePlanCost(ap.id, stores, 'one');
     let line = one.oneStoreBest ? `$${one.oneStoreBest.cost.toFixed(2)} at ${one.oneStoreBest.storeName}` : 'No price data';
-    if (ap.storeMode === 'multi' && stores.length > 1) {
-      const multiEst = await estimatePlanCost(ap.id, stores, 'multi');
-      if (multiEst.multiStore && one.oneStoreBest) {
-        const delta = one.oneStoreBest.cost - multiEst.multiStore.cost;
-        if (delta > 0.01) line += ` • save ~$${delta.toFixed(2)} multi-store`;
-      }
-    }
     const unk = one.oneStoreBest?.unknown?.length || 0;
     if (unk) line += ` • ${unk} unknown`;
-    setSummary(line);
-    setPerStore(one.perStore || []);
-    setUnknownCount(unk);
-    // compute potential savings if switching to multi
-    if (stores.length > 1 && one.oneStoreBest) {
-      const multiEst = await estimatePlanCost(ap.id, stores, 'multi');
-      if (multiEst.multiStore) {
-        const delta = one.oneStoreBest.cost - multiEst.multiStore.cost;
-        setPotentialSavings(delta > 0.01 ? `Switching to multi-store saves ~$${delta.toFixed(2)}` : '');
+    if (ap.storeMode === 'multi' && stores.length > 1) {
+      const multi = await estimatePlanCost(ap.id, stores, 'multi');
+      if (multi.multiStore && one.oneStoreBest) {
+        const delta = one.oneStoreBest.cost - multi.multiStore.cost;
+        if (delta > 0.01) line += ` • save ~$${delta.toFixed(2)} multi-store`;
       }
-      // Build top suggestions by cost
-      if (multiEst.suggestions && multiEst.suggestions.length) {
+      // Suggestions
+      if (multi.suggestions && multi.suggestions.length) {
         const map = await getStoreNamesMap();
-        const tops = multiEst.suggestions
+        const tops = multi.suggestions
           .filter((s) => s.estCost)
           .sort((a, b) => (b.estCost || 0) - (a.estCost || 0))
           .slice(0, 5)
           .map((s) => ({ name: s.name, storeName: s.bestStoreName || (s.bestStoreId ? map[s.bestStoreId] : undefined), estCost: s.estCost }));
         setSuggestions(tops);
       } else setSuggestions([]);
-    } else {
-      setPotentialSavings('');
-      setSuggestions([]);
-    }
-    // Weekly budget variance (compare one-store estimate)
-    const weeklyBudget = profile?.weeklyBudget || 0;
-    if (weeklyBudget > 0 && one.oneStoreBest) {
-      const diff = weeklyBudget - one.oneStoreBest.cost;
-      if (Math.abs(diff) < 0.01) setBudgetVariance('At budget');
-      else if (diff > 0) setBudgetVariance(`Under budget by $${diff.toFixed(2)}`);
-      else setBudgetVariance(`Over budget by $${Math.abs(diff).toFixed(2)}`);
-    } else {
-      setBudgetVariance('');
-    }
-  };
+    } else setSuggestions([]);
+    setSummary(line);
+    setPerStore(one.perStore as any);
 
-  useEffect(() => { refreshSummary(); }, []);
+    // Variances
+    if (profile?.weeklyBudget && one.oneStoreBest) {
+      const diff = profile.weeklyBudget - one.oneStoreBest.cost;
+      setWeeklyVariance(Math.abs(diff) < 0.01 ? 'At weekly budget' : diff > 0 ? `Under weekly by $${diff.toFixed(2)}` : `Over weekly by $${Math.abs(diff).toFixed(2)}`);
+    } else setWeeklyVariance('');
+    if (ap.budgetTarget != null && one.oneStoreBest) {
+      const d2 = ap.budgetTarget - one.oneStoreBest.cost;
+      setPlanVariance(Math.abs(d2) < 0.01 ? 'At plan budget' : d2 > 0 ? `Under plan by $${d2.toFixed(2)}` : `Over plan by $${Math.abs(d2).toFixed(2)}`);
+    } else setPlanVariance('');
+  };
 
   return (
     <View style={styles.container}>
@@ -118,7 +123,7 @@ export default function Plan() {
         <Text style={styles.label}>Event</Text>
       </View>
       <Text style={styles.label}>Per-plan budget (USD)</Text>
-      <Input value={budget} onChangeText={setBudget} keyboardType="decimal-pad" />
+      <Input value={planBudgetInput} onChangeText={setPlanBudgetInput} keyboardType="decimal-pad" />
       <SwitchRow label="Allow multi-store optimization" value={multi} onValueChange={setMulti} />
       <View style={{ height: 8 }} />
       <Button title="Create & Set Active" onPress={onCreate} />
@@ -127,8 +132,8 @@ export default function Plan() {
       <View style={{ height: 16 }} />
       <Text style={styles.subtitle}>Active Plan Summary</Text>
       <Text style={styles.summary}>{summary}</Text>
-      {!!potentialSavings && <Text style={[styles.summary, { color: '#059669' }]}>{potentialSavings}</Text>}
-      {!!budgetVariance && <Text style={[styles.summary, { color: budgetVariance.startsWith('Over') ? '#DC2626' : '#059669' }]}>{budgetVariance}</Text>}
+      {!!weeklyVariance && <Text style={[styles.summary, { color: weeklyVariance.startsWith('Over') ? '#DC2626' : '#059669' }]}>{weeklyVariance}</Text>}
+      {!!planVariance && <Text style={[styles.summary, { color: planVariance.startsWith('Over') ? '#DC2626' : '#059669' }]}>{planVariance}</Text>}
       <View style={{ height: 8 }} />
       <Text style={styles.subtitle}>Cost by Store</Text>
       <FlatList
@@ -165,20 +170,11 @@ export default function Plan() {
       <Button title="Apply to Active Plan" onPress={async () => {
         const ap = await getActivePlan();
         if (!ap) return Alert.alert('No active plan');
-        await updatePlanFields(ap.id, { storeMode: multi ? 'multi' : 'one' });
+        await updatePlanFields(ap.id, { storeMode: multi ? 'multi' : 'one', budgetTarget: planBudgetInput ? Number(planBudgetInput) : null });
         const stores = profile?.preferredStores || [];
         await assignStoresForPlanItems(ap.id, stores, multi ? 'multi' : 'one');
         await refreshSummary();
         Alert.alert('Updated', `Store mode set to ${multi ? 'multi' : 'one'}`);
-      }} />
-      <View style={{ height: 8 }} />
-      <Button title="Assign stores to list items" onPress={async () => {
-        const ap = await getActivePlan();
-        if (!ap) return Alert.alert('No active plan');
-        const stores = profile?.preferredStores || [];
-        if (stores.length === 0) return Alert.alert('Pick stores');
-        await assignStoresForPlanItems(ap.id, stores, ap.storeMode);
-        Alert.alert('Assigned', 'Items now tagged with suggested stores');
       }} />
     </View>
   );
@@ -188,9 +184,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
   title: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
   label: { fontSize: 14, color: '#444', marginTop: 8 },
-  input: { borderColor: '#ccc', borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, padding: 10, marginTop: 6 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
   subtitle: { fontSize: 16, fontWeight: '700' },
   summary: { fontSize: 14, color: '#0a7', marginTop: 6 },
   breakRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }
 });
+
