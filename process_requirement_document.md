@@ -2,6 +2,11 @@
 
 ---
 
+> NOTE: This legacy PRD has been superseded by the new local-first spec for Marble Meal Planner.
+>
+> New PRD: `docs/marble_prd.md`
+> Status: Please review and confirm; we will archive this document after acceptance.
+
 ## 1. Overview
 
 **Goal:**  
