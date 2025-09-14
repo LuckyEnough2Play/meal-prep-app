@@ -1,2 +1,21 @@
 node_modules
 .vercel
+# env and local configs
+.env
+*.env*
+
+# build and coverage artifacts
+coverage/
+.next/
+
+# platform cruft
+.DS_Store
+
+# logs
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# legacy directories (removed)
+frontend/
+supabase/
