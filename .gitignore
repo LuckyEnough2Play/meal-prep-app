@@ -32,3 +32,4 @@ mobile/**/*.jks
 mobile/**/*.p8
 mobile/**/*.mobileprovision
 mobile/expo-debug.log
+*.mmbak

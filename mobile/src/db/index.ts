@@ -102,6 +102,15 @@ export function initDb() {
         created_by TEXT
       );`,
       args: []
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS alias_map (
+        alias TEXT NOT NULL,
+        store_id TEXT,
+        target_item_id TEXT NOT NULL,
+        PRIMARY KEY (alias, store_id)
+      );`,
+      args: []
     }
   ], false, () => {});
 
@@ -317,6 +326,18 @@ export async function estimateRecipeCost(recipe: Recipe, servings: number, store
   const itemsByStore: Record<string, StoreItemRow[]> = {};
   for (const sid of storeIds) itemsByStore[sid] = await listStoreItems(sid);
 
+  // Load alias maps (store-specific and global)
+  const aliasGlobalArr = await run<SQLite.SQLResultSet>(`SELECT alias, target_item_id FROM alias_map WHERE store_id IS NULL`);
+  const aliasGlobal: Record<string, string> = {};
+  for (const a of (aliasGlobalArr.rows as any)._array || []) aliasGlobal[a.alias] = a.target_item_id;
+  const aliasByStore: Record<string, Record<string, string>> = {};
+  for (const sid of storeIds) {
+    const rs = await run<SQLite.SQLResultSet>(`SELECT alias, target_item_id FROM alias_map WHERE store_id = ?`, [sid]);
+    const map: Record<string, string> = {};
+    for (const a of (rs.rows as any)._array || []) map[a.alias] = a.target_item_id;
+    aliasByStore[sid] = map;
+  }
+
   const scaled = (recipe.ingredients || []).map((i) => ({ name: String(i.name || ''), qty: Number(i.qty || 0) * servings, unit: i.unit || null }));
 
   const perStore = storeIds.map((sid) => {
@@ -324,7 +345,10 @@ export async function estimateRecipeCost(recipe: Recipe, servings: number, store
     let cost = 0;
     const unknown: string[] = [];
     for (const need of scaled) {
-      const match = items.find((it) => includesNormalized(it.name, need.name));
+      const aliasKey = canonicalizeName(need.name);
+      const target = (aliasByStore[sid] && aliasByStore[sid][aliasKey]) || aliasGlobal[aliasKey] || null;
+      let match = target ? items.find((it) => it.id === target) : undefined;
+      if (!match) match = items.find((it) => includesNormalized(it.name, need.name));
       if (!match) {
         unknown.push(need.name);
         continue;
@@ -352,7 +376,10 @@ export async function estimateRecipeCost(recipe: Recipe, servings: number, store
       let found = false;
       for (const sid of storeIds) {
         const items = itemsByStore[sid] || [];
-        const match = items.find((it) => includesNormalized(it.name, need.name));
+        const aliasKey = canonicalizeName(need.name);
+        const target = (aliasByStore[sid] && aliasByStore[sid][aliasKey]) || aliasGlobal[aliasKey] || null;
+        let match = target ? items.find((it) => it.id === target) : undefined;
+        if (!match) match = items.find((it) => includesNormalized(it.name, need.name));
         if (match) {
           const pack = match.packageSize || 1;
           const packsNeeded = Math.ceil((need.qty || 0) / pack);

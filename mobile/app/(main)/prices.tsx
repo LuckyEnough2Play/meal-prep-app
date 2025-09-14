@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Switch, FlatList, Alert, ScrollView } from 'react-native';
 import { MAJOR_STORES } from '@/constants/stores';
-import { ensureStore, listStoreItems, seedSamplePrices, upsertStoreItem } from '@/db';
+import { ensureStore, listStoreItems, seedSamplePrices, upsertStoreItem, listAliasesForStore, upsertAlias } from '@/db';
 import { Input } from '@/ui/Input';
 import { Button } from '@/ui/Button';
 
@@ -13,11 +13,16 @@ export default function Prices() {
   const [unit, setUnit] = useState('');
   const [price, setPrice] = useState('');
   const [onSale, setOnSale] = useState(false);
+  const [alias, setAlias] = useState('');
+  const [aliasFilter, setAliasFilter] = useState('');
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [aliases, setAliases] = useState<Array<{ alias: string; targetItemId: string }>>([]);
 
   const load = async (sid = storeId) => {
     await ensureStore(sid, (MAJOR_STORES.find((s) => s.id === sid)?.name || sid));
     const data = await listStoreItems(sid);
     setItems(data);
+    setAliases(await listAliasesForStore(sid));
   };
 
   useEffect(() => {
@@ -41,6 +46,14 @@ export default function Prices() {
     });
     setName(''); setPkg(''); setUnit(''); setPrice(''); setOnSale(false);
     await load();
+  };
+
+  const onSaveAlias = async () => {
+    if (!alias || !selectedItemId) return Alert.alert('Missing', 'Alias and a target item are required');
+    await upsertAlias(alias, storeId, selectedItemId);
+    setAlias(''); setSelectedItemId(null); setAliasFilter('');
+    await load();
+    Alert.alert('Saved', 'Alias mapping created');
   };
 
   return (
@@ -81,6 +94,39 @@ export default function Prices() {
             <Text style={styles.itemMeta}>{item.packageSize || '?'} {item.unit || ''} • ${item.price.toFixed(2)} {item.onSale ? '• SALE' : ''}</Text>
           </View>
         )}
+      />
+
+      <Text style={styles.section}>Aliases (map ingredient name → store item)</Text>
+      <Input placeholder="Alias (ingredient name)" value={alias} onChangeText={setAlias} />
+      <View style={{ height: 8 }} />
+      <Input placeholder="Filter items" value={aliasFilter} onChangeText={setAliasFilter} />
+      <FlatList
+        data={items.filter((it) => !aliasFilter || it.name.toLowerCase().includes(aliasFilter.toLowerCase()))}
+        keyExtractor={(i) => i.id}
+        renderItem={({ item }) => (
+          <Pressable onPress={() => setSelectedItemId(item.id)} style={styles.itemRow}>
+            <Text style={[styles.itemName, selectedItemId === item.id && { color: '#0a7' }]}>{item.name}</Text>
+            <Text style={styles.itemMeta}>{item.packageSize || '?'} {item.unit || ''} • ${item.price.toFixed(2)}</Text>
+          </Pressable>
+        )}
+        style={{ maxHeight: 200 }}
+      />
+      <View style={{ height: 8 }} />
+      <Button title="Save Alias" onPress={onSaveAlias} />
+
+      <Text style={styles.section}>Existing Aliases</Text>
+      <FlatList
+        data={aliases}
+        keyExtractor={(a) => a.alias + '|' + a.targetItemId}
+        renderItem={({ item }) => {
+          const t = items.find((it) => it.id === item.targetItemId);
+          return (
+            <View style={styles.itemRow}>
+              <Text style={styles.itemName}>{item.alias}</Text>
+              <Text style={styles.itemMeta}>{t ? t.name : item.targetItemId}</Text>
+            </View>
+          );
+        }}
       />
     </ScrollView>
   );
