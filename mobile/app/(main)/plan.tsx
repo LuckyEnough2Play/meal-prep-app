@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Switch, Alert, FlatList } from 'react-native';
 import { useApp } from '@/state/AppContext';
-import { upsertPlan, setActivePlan, addShoppingItems, getActivePlan, estimatePlanCost, assignStoresForPlanItems, updatePlanFields } from '@/db';
+import { upsertPlan, setActivePlan, addShoppingItems, getActivePlan, estimatePlanCost, assignStoresForPlanItems, updatePlanFields, getStoreNamesMap } from '@/db';
 import { Button } from '@/ui/Button';
 import { Input } from '@/ui/Input';
 import { SwitchRow } from '@/ui/SwitchRow';
@@ -17,6 +17,7 @@ export default function Plan() {
   const [unknownCount, setUnknownCount] = useState<number>(0);
   const [potentialSavings, setPotentialSavings] = useState<string>('');
   const [budgetVariance, setBudgetVariance] = useState<string>('');
+  const [suggestions, setSuggestions] = useState<Array<{ name: string; storeName?: string; estCost?: number }>>([]);
 
   const onCreate = async () => {
     if (!profile) return Alert.alert('Complete profile first');
@@ -78,8 +79,19 @@ export default function Plan() {
         const delta = one.oneStoreBest.cost - multiEst.multiStore.cost;
         setPotentialSavings(delta > 0.01 ? `Switching to multi-store saves ~$${delta.toFixed(2)}` : '');
       }
+      // Build top suggestions by cost
+      if (multiEst.suggestions && multiEst.suggestions.length) {
+        const map = await getStoreNamesMap();
+        const tops = multiEst.suggestions
+          .filter((s) => s.estCost)
+          .sort((a, b) => (b.estCost || 0) - (a.estCost || 0))
+          .slice(0, 5)
+          .map((s) => ({ name: s.name, storeName: s.bestStoreName || (s.bestStoreId ? map[s.bestStoreId] : undefined), estCost: s.estCost }));
+        setSuggestions(tops);
+      } else setSuggestions([]);
     } else {
       setPotentialSavings('');
+      setSuggestions([]);
     }
     // Weekly budget variance (compare one-store estimate)
     const weeklyBudget = profile?.weeklyBudget || 0;
@@ -129,6 +141,18 @@ export default function Plan() {
           </View>
         )}
       />
+      {!!suggestions.length && (
+        <>
+          <View style={{ height: 8 }} />
+          <Text style={styles.subtitle}>Top Savings Suggestions (multi-store)</Text>
+          {suggestions.map((s, idx) => (
+            <View key={idx} style={styles.breakRow}>
+              <Text>{s.name}</Text>
+              <Text>{s.storeName ? `Buy at ${s.storeName}` : 'No match'}{s.estCost ? ` • ~$${s.estCost.toFixed(2)}` : ''}</Text>
+            </View>
+          ))}
+        </>
+      )}
       <View style={{ height: 8 }} />
       <SwitchRow label="Use multi-store optimization" value={multi} onValueChange={setMulti} />
       <Button title="Apply to Active Plan" onPress={async () => {
@@ -160,5 +184,6 @@ const styles = StyleSheet.create({
   input: { borderColor: '#ccc', borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, padding: 10, marginTop: 6 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
   subtitle: { fontSize: 16, fontWeight: '700' },
-  summary: { fontSize: 14, color: '#0a7', marginTop: 6 }
+  summary: { fontSize: 14, color: '#0a7', marginTop: 6 },
+  breakRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }
 });

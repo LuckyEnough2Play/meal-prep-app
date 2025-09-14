@@ -507,6 +507,17 @@ export async function getActivePlan(): Promise<Plan | null> {
   } as Plan;
 }
 
+export async function updatePlanFields(planId: string, fields: Partial<{ name: string; budgetTarget: number | null; storeMode: 'one' | 'multi' }>): Promise<void> {
+  const sets: string[] = [];
+  const args: any[] = [];
+  if (Object.prototype.hasOwnProperty.call(fields, 'name')) { sets.push('name = ?'); args.push(fields.name ?? null); }
+  if (Object.prototype.hasOwnProperty.call(fields, 'budgetTarget')) { sets.push('budget_target = ?'); args.push(fields.budgetTarget ?? null); }
+  if (Object.prototype.hasOwnProperty.call(fields, 'storeMode')) { sets.push('store_mode = ?'); args.push(fields.storeMode ?? 'one'); }
+  if (!sets.length) return;
+  args.push(planId);
+  await run(`UPDATE plan SET ${sets.join(', ')} WHERE id = ?`, args);
+}
+
 // Shopping list
 export async function addShoppingItems(planId: string, items: Omit<ShoppingListItem, 'id' | 'checkedBy'>[]): Promise<string[]> {
   const ids: string[] = [];
