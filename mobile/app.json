@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Marble Meal Planner",
+    "slug": "marble-meal-planner",
+    "scheme": "marble",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "plugins": [
+      "expo-secure-store",
+      "expo-sqlite"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.marble.mealplanner"
+    },
+    "android": {
+      "package": "com.marble.mealplanner"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
+
