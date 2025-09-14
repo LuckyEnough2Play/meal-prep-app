@@ -92,6 +92,16 @@ export function initDb() {
         FOREIGN KEY (plan_id) REFERENCES plan(id) ON DELETE CASCADE
       );`,
       args: []
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS grp (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        expires_at TEXT,
+        created_by TEXT
+      );`,
+      args: []
     }
   ], false, () => {});
 
@@ -565,4 +575,27 @@ export async function getStoreNamesMap(): Promise<Record<string, string>> {
   const map: Record<string, string> = {};
   for (const r of (rs.rows as any)._array || []) map[r.id] = r.name;
   return map;
+}
+
+// Groups
+export type GroupRow = { id: string; name: string; type: 'static' | 'event'; expiresAt?: string | null; createdBy?: string | null };
+
+export async function createGroup(input: { name: string; type: 'static' | 'event'; expiresAt?: string | null; createdBy: string }): Promise<GroupRow> {
+  const id = `g-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  await run(`INSERT INTO grp (id, name, type, expires_at, created_by) VALUES (?, ?, ?, ?, ?)`, [id, input.name, input.type, input.expiresAt ?? null, input.createdBy]);
+  return { id, name: input.name, type: input.type, expiresAt: input.expiresAt ?? null, createdBy: input.createdBy };
+}
+
+export async function listGroups(): Promise<GroupRow[]> {
+  const rs = await run<SQLite.SQLResultSet>(`SELECT * FROM grp ORDER BY name COLLATE NOCASE`);
+  const arr = (rs.rows as any)._array as any[];
+  return arr.map((r) => ({ id: r.id, name: r.name, type: r.type, expiresAt: r.expires_at ?? null, createdBy: r.created_by ?? null }));
+}
+
+export async function upsertGroupFromInvite(grp: GroupRow): Promise<void> {
+  await run(
+    `INSERT INTO grp (id, name, type, expires_at, created_by) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET name=excluded.name, type=excluded.type, expires_at=excluded.expires_at`,
+    [grp.id, grp.name, grp.type, grp.expiresAt ?? null, grp.createdBy ?? null]
+  );
 }

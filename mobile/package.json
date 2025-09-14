@@ -11,11 +11,15 @@
   },
   "dependencies": {
     "expo": "^51.0.0",
+    "expo-barcode-scanner": "^13.0.0",
+    "expo-clipboard": "^6.0.0",
     "expo-crypto": "^13.0.0",
     "expo-file-system": "^17.0.0",
     "expo-router": "^3.5.0",
     "expo-secure-store": "^13.0.0",
     "expo-sqlite": "^14.0.0",
+    "expo-linking": "^6.3.0",
+    "react-native-qrcode-svg": "^6.3.0",
     "react": "18.2.0",
     "react-native": "0.74.0"
   },
@@ -26,4 +30,3 @@
     "typescript": "^5.4.0"
   }
 }
-

@@ -1,16 +1,136 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Alert, Modal } from 'react-native';
+import { useApp } from '@/state/AppContext';
+import { Button } from '@/ui/Button';
+import { Input } from '@/ui/Input';
+import { SwitchRow } from '@/ui/SwitchRow';
+import { createGroup, listGroups, type GroupRow, upsertGroupFromInvite } from '@/db';
+import { setGroupKey, getGroupKey } from '@/storage/secure';
+import * as Crypto from 'expo-crypto';
+import { buildInviteURL, parseInviteURL } from '@/sync/invite';
+import * as Clipboard from 'expo-clipboard';
+import QRCode from 'react-native-qrcode-svg';
+import { BarCodeScanner } from 'expo-barcode-scanner';
 
 export default function Groups() {
+  const { profile } = useApp();
+  const [groups, setGroups] = useState<GroupRow[]>([]);
+  const [name, setName] = useState('My Group');
+  const [isEvent, setIsEvent] = useState(false);
+  const [showQR, setShowQR] = useState<string | null>(null);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+
+  const load = async () => { setGroups(await listGroups()); };
+  useEffect(() => { load(); }, []);
+
+  const onCreate = async () => {
+    if (!profile) return Alert.alert('Complete profile first');
+    const g = await createGroup({ name, type: isEvent ? 'event' : 'static', createdBy: profile.id });
+    // Generate group key (hex) and store in SecureStore
+    const bytes = await Crypto.getRandomBytesAsync(32);
+    const keyHex = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+    await setGroupKey(g.id, keyHex);
+    const link = buildInviteURL({ gid: g.id, name: g.name, type: g.type, exp: g.expiresAt || undefined, key: keyHex });
+    setInviteLink(link);
+    setShowQR(link);
+    await load();
+  };
+
+  const onCopy = async () => { if (inviteLink) { await Clipboard.setStringAsync(inviteLink); Alert.alert('Copied', 'Invite link copied to clipboard'); } };
+
+  const startScan = async () => {
+    const { status } = await BarCodeScanner.requestPermissionsAsync();
+    setHasPermission(status === 'granted');
+    setScanning(true);
+  };
+
+  const onBarCodeScanned = async ({ data }: { data: string }) => {
+    setScanning(false);
+    await handleInvite(data);
+  };
+
+  const handleInvite = async (url: string) => {
+    const parsed = parseInviteURL(url);
+    if (!parsed) return Alert.alert('Invalid invite');
+    await upsertGroupFromInvite({ id: parsed.gid, name: parsed.name, type: parsed.type, expiresAt: parsed.exp || null, createdBy: null });
+    await setGroupKey(parsed.gid, parsed.key);
+    await load();
+    Alert.alert('Joined', `You joined group: ${parsed.name}`);
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Groups</Text>
-      <Text>Create static or event groups; invite via QR or link.</Text>
+      <Text style={styles.sub}>Create static or event groups; invite via QR or link.</Text>
+
+      <Text style={styles.label}>Group name</Text>
+      <Input value={name} onChangeText={setName} />
+      <SwitchRow label="Event group (expires)" value={isEvent} onValueChange={setIsEvent} />
+      <View style={{ height: 8 }} />
+      <Button title="Create & Invite" onPress={onCreate} />
+
+      <View style={{ height: 16 }} />
+      <Text style={styles.subtitle}>Your Groups</Text>
+      <FlatList
+        data={groups}
+        keyExtractor={(g) => g.id}
+        renderItem={({ item }) => (
+          <View style={styles.groupRow}>
+            <Text style={styles.groupName}>{item.name}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Button title="Invite" onPress={async () => { const key = await getGroupKey(item.id); if (!key) { Alert.alert('Missing key', 'No group key found on this device'); return; } const link = buildInviteURL({ gid: item.id, name: item.name, type: item.type, exp: item.expiresAt || undefined, key }); setInviteLink(link); setShowQR(link); }} />
+            </View>
+          </View>
+        )}
+      />
+
+      <View style={{ height: 16 }} />
+      <Text style={styles.subtitle}>Join Group</Text>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Button title="Scan QR" onPress={startScan} />
+        <Button title="Paste Link" onPress={async () => { const text = await Clipboard.getStringAsync(); if (text) await handleInvite(text); }} />
+      </View>
+
+      <Modal visible={!!showQR} transparent animationType="fade" onRequestClose={() => setShowQR(null)}>
+        <View style={styles.modalWrap}>
+          <View style={styles.modalCard}>
+            <Text style={styles.subtitle}>Share Invite</Text>
+            {!!showQR && <QRCode value={showQR} size={240} />}
+            <View style={{ height: 12 }} />
+            <Button title="Copy Link" onPress={onCopy} />
+            <View style={{ height: 8 }} />
+            <Button title="Close" onPress={() => setShowQR(null)} />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={scanning} transparent animationType="slide" onRequestClose={() => setScanning(false)}>
+        <View style={styles.scanWrap}>
+          {hasPermission === false ? (
+            <Text>No camera permission</Text>
+          ) : (
+            <BarCodeScanner onBarCodeScanned={onBarCodeScanned} style={styles.scanner} />
+          )}
+          <View style={{ height: 8 }} />
+          <Button title="Cancel" onPress={() => setScanning(false)} />
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
-  title: { fontSize: 20, fontWeight: '700', marginBottom: 8 }
+  title: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
+  sub: { color: '#666', marginBottom: 8 },
+  subtitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
+  label: { fontSize: 14, color: '#444', marginTop: 8, marginBottom: 6 },
+  groupRow: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  groupName: { fontSize: 16, fontWeight: '600' },
+  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  modalCard: { backgroundColor: 'white', padding: 16, borderRadius: 12, alignItems: 'center' },
+  scanWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  scanner: { width: '100%', height: '60%', borderRadius: 12 }
 });
-

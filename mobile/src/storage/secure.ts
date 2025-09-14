@@ -21,3 +21,14 @@ export async function getOrCreateMasterKey() {
   }
   return key;
 }
+
+export async function setGroupKey(groupId: string, hexKey: string) {
+  await SecureStore.setItemAsync(`marble_group_key_${groupId}`, hexKey, {
+    keychainService: `marble_group_key_${groupId}`,
+    accessible: SecureStore.AFTER_FIRST_UNLOCK
+  });
+}
+
+export async function getGroupKey(groupId: string) {
+  return SecureStore.getItemAsync(`marble_group_key_${groupId}`);
+}
