@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import type { Plan, ShoppingListItem, UserProfile } from '@/models/types';
+import type { Plan, Recipe, ShoppingListItem, UserProfile } from '@/models/types';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -236,6 +236,76 @@ export async function listShoppingItems(planId: string): Promise<ShoppingListIte
     unit: row.unit ?? undefined,
     checkedBy: safeParseArray(row.checked_by)
   }));
+}
+
+// Recipes
+export async function seedRecipesIfEmpty(recipes: Recipe[]): Promise<void> {
+  const rs = await run<SQLite.SQLResultSet>(`SELECT COUNT(1) as c FROM recipe`);
+  const count = (rs.rows as any)._array?.[0]?.c ?? 0;
+  if (count > 0) return;
+  for (const r of recipes) {
+    await run(
+      `INSERT INTO recipe (id, name, ingredients_json, instructions, tags, diet_types, allergens, time_prep, time_cook, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        r.id,
+        r.name,
+        JSON.stringify(r.ingredients || []),
+        r.instructions ?? null,
+        JSON.stringify(r.tags || []),
+        JSON.stringify(r.dietTypes || []),
+        JSON.stringify(r.allergens || []),
+        r.timePrep ?? null,
+        r.timeCook ?? null,
+        r.createdBy ?? 'starter'
+      ]
+    );
+  }
+}
+
+export async function listRecipes(): Promise<Recipe[]> {
+  const rs = await run<SQLite.SQLResultSet>(`SELECT * FROM recipe ORDER BY name COLLATE NOCASE`);
+  const arr = (rs.rows as any)._array as any[];
+  return arr.map((row) => ({
+    id: row.id,
+    name: row.name,
+    ingredients: JSON.parse(row.ingredients_json || '[]'),
+    instructions: row.instructions ?? undefined,
+    tags: safeParseArray(row.tags),
+    dietTypes: safeParseArray(row.diet_types),
+    allergens: safeParseArray(row.allergens),
+    timePrep: row.time_prep ?? undefined,
+    timeCook: row.time_cook ?? undefined,
+    createdBy: row.created_by ?? undefined
+  }));
+}
+
+export async function appendMealToPlan(planId: string, meal: { recipeId: string; servings: number }) {
+  const rs = await run<SQLite.SQLResultSet>(`SELECT meals_json FROM plan WHERE id = ?`, [planId]);
+  const row = (rs.rows as any)._array?.[0];
+  const meals = row ? (JSON.parse(row.meals_json || '[]') as any[]) : [];
+  meals.push(meal);
+  await run(`UPDATE plan SET meals_json = ? WHERE id = ?`, [JSON.stringify(meals), planId]);
+}
+
+export async function addOrMergeShoppingItems(planId: string, items: Omit<ShoppingListItem, 'id' | 'checkedBy'>[]) {
+  const existing = await listShoppingItems(planId);
+  for (const it of items) {
+    const match = existing.find((e) => e.name.toLowerCase() === (it.name || '').toLowerCase() && (e.unit || '') === (it.unit || ''));
+    if (match) {
+      const newQty = (match.qty || 0) + (it.qty || 0);
+      await run(`UPDATE shopping_list_item SET qty = ? WHERE id = ?`, [newQty, match.id]);
+      match.qty = newQty;
+    } else {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      await run(
+        `INSERT INTO shopping_list_item (id, plan_id, store_id, ingredient_id, name, qty, unit, checked_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, '[]')`,
+        [id, planId, it.storeId ?? null, it.ingredientId ?? null, it.name, it.qty, it.unit ?? null]
+      );
+      existing.push({ ...(it as any), id, planId, checkedBy: [] });
+    }
+  }
 }
 
 export async function toggleShoppingItemChecked(itemId: string, userId: string): Promise<void> {
