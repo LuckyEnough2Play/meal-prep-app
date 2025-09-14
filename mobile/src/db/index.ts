@@ -753,3 +753,17 @@ export async function getAppState(key: string): Promise<string | null> {
   const r = (rs.rows as any)._array?.[0];
   return r ? String(r.value) : null;
 }
+
+export async function setListItemStore(itemId: string, storeId: string | null): Promise<void> {
+  await run(`UPDATE shopping_list_item SET store_id = ? WHERE id = ?`, [storeId, itemId]);
+}
+
+export async function getAisleForStoreAlias(storeId: string, aliasName: string): Promise<string | null> {
+  const alias = canonicalizeName(aliasName);
+  const rs = await run<SQLite.SQLResultSet>(`SELECT target_item_id FROM alias_map WHERE alias = ? AND store_id = ?`, [alias, storeId]);
+  const row = (rs.rows as any)._array?.[0];
+  if (!row) return null;
+  const rs2 = await run<SQLite.SQLResultSet>(`SELECT aisle FROM store_item WHERE id = ?`, [row.target_item_id]);
+  const r2 = (rs2.rows as any)._array?.[0];
+  return r2 ? (r2.aisle ?? null) : null;
+}
