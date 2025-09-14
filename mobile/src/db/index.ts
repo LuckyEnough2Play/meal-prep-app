@@ -33,6 +33,22 @@ export function initDb() {
       args: []
     },
     {
+      sql: `CREATE TABLE IF NOT EXISTS store_item (
+        id TEXT PRIMARY KEY,
+        store_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        package_size REAL,
+        unit TEXT,
+        price REAL NOT NULL,
+        on_sale INTEGER DEFAULT 0,
+        last_seen INTEGER,
+        UNIQUE(store_id, name),
+        FOREIGN KEY (store_id) REFERENCES store(id) ON DELETE CASCADE
+      );`,
+      args: []
+    },
+    { sql: `CREATE INDEX IF NOT EXISTS idx_store_item_store ON store_item(store_id)`, args: [] },
+    {
       sql: `CREATE TABLE IF NOT EXISTS recipe (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -182,6 +198,161 @@ export async function upsertPlan(p: Plan): Promise<void> {
       p.isActive ? 1 : 0
     ]
   );
+}
+
+// Store & Items
+export async function ensureStore(storeId: string, name: string): Promise<void> {
+  await run(`INSERT INTO store (id, name) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name`, [storeId, name]);
+}
+
+export interface StoreItemInput { name: string; packageSize?: number | null; unit?: string | null; price: number; onSale?: boolean }
+
+export async function upsertStoreItem(storeId: string, input: StoreItemInput): Promise<void> {
+  const now = Date.now();
+  await run(
+    `INSERT INTO store_item (id, store_id, name, package_size, unit, price, on_sale, last_seen)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(store_id, name) DO UPDATE SET
+       package_size=excluded.package_size,
+       unit=excluded.unit,
+       price=excluded.price,
+       on_sale=excluded.on_sale,
+       last_seen=excluded.last_seen`,
+    [
+      `${storeId}:${input.name.toLowerCase()}`,
+      storeId,
+      input.name,
+      input.packageSize ?? null,
+      input.unit ?? null,
+      input.price,
+      input.onSale ? 1 : 0,
+      now
+    ]
+  );
+}
+
+export type StoreItemRow = { id: string; storeId: string; name: string; packageSize?: number; unit?: string; price: number; onSale: boolean; lastSeen?: number };
+
+export async function listStoreItems(storeId: string): Promise<StoreItemRow[]> {
+  const rs = await run<SQLite.SQLResultSet>(`SELECT * FROM store_item WHERE store_id = ? ORDER BY name COLLATE NOCASE`, [storeId]);
+  return ((rs.rows as any)._array as any[]).map((r) => ({
+    id: r.id,
+    storeId: r.store_id,
+    name: r.name,
+    packageSize: r.package_size ?? undefined,
+    unit: r.unit ?? undefined,
+    price: Number(r.price),
+    onSale: !!r.on_sale,
+    lastSeen: r.last_seen ?? undefined
+  }));
+}
+
+export async function seedSamplePrices(): Promise<void> {
+  // Minimal seed for demo across stores
+  const seeds: Array<{ storeId: string; storeName: string; items: StoreItemInput[] }> = [
+    {
+      storeId: 'aldi',
+      storeName: 'Aldi',
+      items: [
+        { name: 'Chicken breast', packageSize: 1, unit: 'lb', price: 3.49 },
+        { name: 'Broccoli', packageSize: 1, unit: 'head', price: 1.29 },
+        { name: 'Rice', packageSize: 1, unit: 'lb', price: 1.19 },
+        { name: 'Olive oil', packageSize: 16, unit: 'oz', price: 6.99, onSale: true }
+      ]
+    },
+    {
+      storeId: 'walmart',
+      storeName: 'Walmart',
+      items: [
+        { name: 'Chicken breast', packageSize: 1, unit: 'lb', price: 3.99 },
+        { name: 'Broccoli', packageSize: 1, unit: 'head', price: 1.49, onSale: true },
+        { name: 'Rice', packageSize: 2, unit: 'lb', price: 2.28 },
+        { name: 'Tofu', packageSize: 14, unit: 'oz', price: 2.49 }
+      ]
+    },
+    {
+      storeId: 'publix',
+      storeName: 'Publix',
+      items: [
+        { name: 'Ground beef', packageSize: 1, unit: 'lb', price: 5.49 },
+        { name: 'Lettuce', packageSize: 1, unit: 'head', price: 2.19 },
+        { name: 'Tomato', packageSize: 1, unit: 'pc', price: 0.79 },
+        { name: 'Cheddar cheese', packageSize: 8, unit: 'oz', price: 3.99 }
+      ]
+    },
+    { storeId: 'kroger', storeName: 'Kroger', items: [{ name: 'Soy sauce (gluten-free optional)', packageSize: 10, unit: 'oz', price: 2.99 }] },
+    { storeId: 'traderjoes', storeName: "Trader Joe's", items: [{ name: 'Mixed vegetables', packageSize: 16, unit: 'oz', price: 2.49 }] }
+  ];
+  for (const s of seeds) {
+    await ensureStore(s.storeId, s.storeName);
+    for (const it of s.items) await upsertStoreItem(s.storeId, it);
+  }
+}
+
+export type EstimateResult = {
+  perStore: Array<{ storeId: string; storeName: string; cost: number; unknown: string[] }>;
+  oneStoreBest?: { storeId: string; storeName: string; cost: number; unknown: string[] };
+  multiStore?: { cost: number; unknown: string[] };
+};
+
+export async function estimateRecipeCost(recipe: Recipe, servings: number, storeIds: string[], storeMode: 'one' | 'multi'): Promise<EstimateResult> {
+  // Load store names
+  const storeNames: Record<string, string> = {};
+  const rsStores = await run<SQLite.SQLResultSet>(`SELECT id, name FROM store`);
+  for (const r of (rsStores.rows as any)._array as any[]) storeNames[r.id] = r.name;
+
+  // Load items for selected stores
+  const itemsByStore: Record<string, StoreItemRow[]> = {};
+  for (const sid of storeIds) itemsByStore[sid] = await listStoreItems(sid);
+
+  const scaled = (recipe.ingredients || []).map((i) => ({ name: String(i.name || ''), qty: Number(i.qty || 0) * servings, unit: i.unit || null }));
+
+  const perStore = storeIds.map((sid) => {
+    const items = itemsByStore[sid] || [];
+    let cost = 0;
+    const unknown: string[] = [];
+    for (const need of scaled) {
+      const match = items.find((it) => it.name.toLowerCase().includes(need.name.toLowerCase()));
+      if (!match) {
+        unknown.push(need.name);
+        continue;
+      }
+      const pack = match.packageSize || 1;
+      const packsNeeded = Math.ceil((need.qty || 0) / pack);
+      cost += packsNeeded * (match.price || 0);
+    }
+    return { storeId: sid, storeName: storeNames[sid] || sid, cost, unknown };
+  });
+
+  let oneStoreBest = undefined as EstimateResult['oneStoreBest'];
+  if (perStore.length) {
+    oneStoreBest = perStore.slice().sort((a, b) => a.cost - b.cost)[0];
+  }
+
+  let multiStore = undefined as EstimateResult['multiStore'];
+  if (storeMode === 'multi' && storeIds.length > 1) {
+    let cost = 0;
+    const unknown: string[] = [];
+    for (const need of scaled) {
+      let best = Infinity;
+      let found = false;
+      for (const sid of storeIds) {
+        const items = itemsByStore[sid] || [];
+        const match = items.find((it) => it.name.toLowerCase().includes(need.name.toLowerCase()));
+        if (match) {
+          const pack = match.packageSize || 1;
+          const packsNeeded = Math.ceil((need.qty || 0) / pack);
+          const c = packsNeeded * (match.price || 0);
+          if (c < best) best = c;
+          found = true;
+        }
+      }
+      if (found) cost += best; else unknown.push(need.name);
+    }
+    multiStore = { cost, unknown };
+  }
+
+  return { perStore, oneStoreBest, multiStore };
 }
 
 export async function setActivePlan(planId: string): Promise<void> {

@@ -9,6 +9,7 @@ export default function Home() {
       <Link href="/(main)/plan" style={styles.link}>Plans</Link>
       <Link href="/(main)/list" style={styles.link}>Shopping List</Link>
       <Link href="/(main)/groups" style={styles.link}>Groups</Link>
+      <Link href="/(main)/prices" style={styles.link}>Prices & Stores</Link>
     </View>
   );
 }
@@ -18,4 +19,3 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '700', marginBottom: 16 },
   link: { fontSize: 18, color: '#07a', marginBottom: 12 }
 });
-

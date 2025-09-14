@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, TextInput, Alert } from 'react-native';
 import { useApp } from '@/state/AppContext';
-import { appendMealToPlan, addOrMergeShoppingItems, getActivePlan, listRecipes, seedRecipesIfEmpty } from '@/db';
+import { appendMealToPlan, addOrMergeShoppingItems, estimateRecipeCost, getActivePlan, listRecipes, seedRecipesIfEmpty } from '@/db';
 import { STARTER_RECIPES } from '@/data/recipes';
 import { evaluateCompatibility } from '@/features/recipes/compatibility';
 import type { Recipe } from '@/models/types';
@@ -69,6 +69,7 @@ export default function Meals() {
           <View style={styles.card}>
             <Text style={styles.name}>{item.name}</Text>
             <Text style={styles.meta}>{(item.tags || []).join(' • ')}</Text>
+            <CostEstimate recipe={item} servings={Number(servingsById[item.id] || '1') || 1} />
             <View style={styles.row}>
               <TextInput
                 style={styles.servings}
@@ -98,3 +99,27 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: '#0a7', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8 },
   addText: { color: 'white', fontWeight: '700' }
 });
+
+function CostEstimate({ recipe, servings }: { recipe: Recipe; servings: number }) {
+  const { profile } = useApp();
+  const [text, setText] = useState<string>('');
+  useEffect(() => {
+    (async () => {
+      const stores = profile?.preferredStores || [];
+      if (stores.length === 0) {
+        setText('Select stores to see savings');
+        return;
+      }
+      const mode: 'one' | 'multi' = 'one'; // quick hint; true mode lives on plan, but for card preview show one-store
+      const est = await estimateRecipeCost(recipe, servings, stores, mode);
+      if (!est.oneStoreBest) {
+        setText('No price data yet');
+        return;
+      }
+      const unknown = est.oneStoreBest.unknown.length;
+      const approx = unknown > 0 ? '~' : '';
+      setText(`${approx}$${est.oneStoreBest.cost.toFixed(2)} at ${est.oneStoreBest.storeName}${unknown ? ` • ${unknown} unknown` : ''}`);
+    })();
+  }, [recipe.id, servings, profile?.preferredStores?.join(',')]);
+  return <Text style={{ fontSize: 12, color: '#0a7', marginTop: 6 }}>{text}</Text>;
+}
