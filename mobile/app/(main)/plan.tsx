@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Switch, Alert, FlatList } from 'react-native';
 import { useApp } from '@/state/AppContext';
-import { upsertPlan, setActivePlan, addShoppingItems, getActivePlan, estimatePlanCost, assignStoresForPlanItems, updatePlanFields, getStoreNamesMap } from '@/db';
+import { upsertPlan, setActivePlan, addShoppingItems, getActivePlan, estimatePlanCost, assignStoresForPlanItems, updatePlanFields, getStoreNamesMap, refreshStoreNow } from '@/db';
 import { Button } from '@/ui/Button';
 import { Input } from '@/ui/Input';
 import { SwitchRow } from '@/ui/SwitchRow';
@@ -137,7 +137,14 @@ export default function Plan() {
         renderItem={({ item }) => (
           <View style={styles.breakRow}>
             <Text style={{ fontWeight: '600' }}>{item.storeName}</Text>
-            <Text>${item.cost.toFixed(2)}{item.unknown.length ? ` • ${item.unknown.length} unknown` : ''}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text>
+                ${item.cost.toFixed(2)}
+                {item.unknown.length ? ` • ${item.unknown.length} unknown` : ''}
+                {item.stale ? ` • ${item.stale} stale` : ''}
+              </Text>
+              <Button title="Refresh" onPress={async () => { await refreshStoreNow(item.storeId); await refreshSummary(); }} />
+            </View>
           </View>
         )}
       />

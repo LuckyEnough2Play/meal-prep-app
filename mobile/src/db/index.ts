@@ -636,6 +636,23 @@ export async function getStoreNamesMap(): Promise<Record<string, string>> {
   return map;
 }
 
+export async function getStoreById(storeId: string): Promise<{ id: string; name: string; lastPriceRefresh?: number } | null> {
+  const rs = await run<SQLite.SQLResultSet>(`SELECT id, name, last_price_refresh FROM store WHERE id = ?`, [storeId]);
+  const r = (rs.rows as any)._array?.[0];
+  if (!r) return null;
+  return { id: r.id, name: r.name, lastPriceRefresh: r.last_price_refresh ?? undefined };
+}
+
+export async function setStoreLastRefresh(storeId: string, ts: number): Promise<void> {
+  await run(`UPDATE store SET last_price_refresh = ? WHERE id = ?`, [ts, storeId]);
+}
+
+export async function refreshStoreNow(storeId: string): Promise<void> {
+  const now = Date.now();
+  await run(`UPDATE store SET last_price_refresh = ? WHERE id = ?`, [now, storeId]);
+  await run(`UPDATE store_item SET last_seen = ? WHERE store_id = ?`, [now, storeId]);
+}
+
 // Groups
 export type GroupRow = { id: string; name: string; type: 'static' | 'event'; expiresAt?: string | null; createdBy?: string | null };
 

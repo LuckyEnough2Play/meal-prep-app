@@ -13,6 +13,7 @@ export default function Prices() {
   const [unit, setUnit] = useState('');
   const [price, setPrice] = useState('');
   const [onSale, setOnSale] = useState(false);
+  const [aisle, setAisle] = useState('');
   const [alias, setAlias] = useState('');
   const [aliasFilter, setAliasFilter] = useState('');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -45,9 +46,10 @@ export default function Prices() {
       packageSize: pkg ? Number(pkg) : undefined,
       unit: unit || undefined,
       price: Number(price),
-      onSale
+      onSale,
+      aisle: aisle || undefined
     });
-    setName(''); setPkg(''); setUnit(''); setPrice(''); setOnSale(false);
+    setName(''); setPkg(''); setUnit(''); setPrice(''); setOnSale(false); setAisle('');
     await load();
   };
 
@@ -86,6 +88,9 @@ export default function Prices() {
           <Switch value={onSale} onValueChange={setOnSale} />
         </View>
       </View>
+      <View style={styles.formRow}>
+        <Input placeholder="Aisle (optional)" value={aisle} onChangeText={setAisle} />
+      </View>
       <Button title="Add / Update" onPress={onAdd} />
 
       <Text style={styles.section}>Items</Text>
@@ -95,7 +100,7 @@ export default function Prices() {
         renderItem={({ item }) => (
           <View style={styles.itemRow}>
             <Text style={styles.itemName}>{item.name}</Text>
-            <Text style={styles.itemMeta}>{item.packageSize || '?'} {item.unit || ''} • ${item.price.toFixed(2)} {item.onSale ? '• SALE' : ''}</Text>
+            <Text style={styles.itemMeta}>{item.packageSize || '?'} {item.unit || ''} • ${item.price.toFixed(2)} {item.onSale ? '• SALE' : ''} {item.aisle ? `• Aisle ${item.aisle}` : ''}</Text>
           </View>
         )}
       />
