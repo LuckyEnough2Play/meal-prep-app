@@ -20,7 +20,8 @@ export default function List() {
     setItems(data);
     // Build suggestions from plan estimate (multi-store)
     if (ap) {
-      const est = await estimatePlanCost(ap.id, Object.keys(storeNames), 'multi');
+      const storeIds = profile?.preferredStores || [];
+      const est = await estimatePlanCost(ap.id, storeIds, 'multi');
       const map: Record<string, { storeId: string; storeName: string }> = {};
       if (est.suggestions) {
         for (const s of est.suggestions) {

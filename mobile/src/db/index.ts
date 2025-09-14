@@ -331,7 +331,7 @@ export async function seedSamplePrices(): Promise<void> {
 }
 
 export type EstimateResult = {
-  perStore: Array<{ storeId: string; storeName: string; cost: number; unknown: string[] }>;
+  perStore: Array<{ storeId: string; storeName: string; cost: number; unknown: string[]; stale: number }>;
   oneStoreBest?: { storeId: string; storeName: string; cost: number; unknown: string[] };
   multiStore?: { cost: number; unknown: string[] };
   suggestions?: Array<{ name: string; bestStoreId?: string; bestStoreName?: string; bestItemId?: string; estCost?: number }>;
@@ -365,6 +365,8 @@ export async function estimateRecipeCost(recipe: Recipe, servings: number, store
     const items = itemsByStore[sid] || [];
     let cost = 0;
     const unknown: string[] = [];
+    let stale = 0;
+    const staleThresholdMs = 7 * 24 * 60 * 60 * 1000;
     for (const need of scaled) {
       const aliasKey = canonicalizeName(need.name);
       const target = (aliasByStore[sid] && aliasByStore[sid][aliasKey]) || aliasGlobal[aliasKey] || null;
@@ -377,8 +379,9 @@ export async function estimateRecipeCost(recipe: Recipe, servings: number, store
       const pack = match.packageSize || 1;
       const packsNeeded = Math.ceil((need.qty || 0) / pack);
       cost += packsNeeded * (match.price || 0);
+      if (!match.lastSeen || Date.now() - Number(match.lastSeen) > staleThresholdMs) stale += 1;
     }
-    return { storeId: sid, storeName: storeNames[sid] || sid, cost, unknown };
+    return { storeId: sid, storeName: storeNames[sid] || sid, cost, unknown, stale };
   });
 
   let oneStoreBest = undefined as EstimateResult['oneStoreBest'];
