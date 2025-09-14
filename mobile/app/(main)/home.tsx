@@ -10,6 +10,7 @@ export default function Home() {
       <Link href="/(main)/list" style={styles.link}>Shopping List</Link>
       <Link href="/(main)/groups" style={styles.link}>Groups</Link>
       <Link href="/(main)/prices" style={styles.link}>Prices & Stores</Link>
+      <Link href="/(main)/backup" style={styles.link}>Backup & Restore</Link>
     </View>
   );
 }

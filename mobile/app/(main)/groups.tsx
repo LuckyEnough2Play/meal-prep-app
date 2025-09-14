@@ -11,6 +11,7 @@ import { buildInviteURL, parseInviteURL } from '@/sync/invite';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { BarCodeScanner } from 'expo-barcode-scanner';
+import * as Linking from 'expo-linking';
 
 export default function Groups() {
   const { profile } = useApp();
@@ -24,6 +25,15 @@ export default function Groups() {
 
   const load = async () => { setGroups(await listGroups()); };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', async (e) => {
+      const url = e.url;
+      if (url && url.includes('marble://invite')) {
+        await handleInvite(url);
+      }
+    });
+    return () => { sub.remove(); };
+  }, []);
 
   const onCreate = async () => {
     if (!profile) return Alert.alert('Complete profile first');
