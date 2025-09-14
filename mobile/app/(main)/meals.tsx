@@ -5,6 +5,8 @@ import { appendMealToPlan, addOrMergeShoppingItems, estimateRecipeCost, getActiv
 import { STARTER_RECIPES } from '@/data/recipes';
 import { evaluateCompatibility } from '@/features/recipes/compatibility';
 import type { Recipe } from '@/models/types';
+import { Card } from '@/ui/Card';
+import { Button } from '@/ui/Button';
 
 export default function Meals() {
   const { profile } = useApp();
@@ -56,6 +58,10 @@ export default function Meals() {
     // Create items scaled by servings
     const items = (r.ingredients || []).map((i) => ({ name: i.name || '', qty: (i.qty || 0) * s, unit: i.unit }));
     await addOrMergeShoppingItems(ap.id, items);
+    // Assign stores according to plan mode
+    const stores = profile?.preferredStores || [];
+    const { assignStoresForPlanItems } = await import('@/db');
+    await assignStoresForPlanItems(ap.id, stores, ap.storeMode);
     Alert.alert('Added', `${r.name} x ${s} added to plan and list.`);
   };
 
@@ -66,7 +72,7 @@ export default function Meals() {
         data={recipes}
         keyExtractor={(i) => i.id}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <Card style={styles.card}>
             <Text style={styles.name}>{item.name}</Text>
             <Text style={styles.meta}>{(item.tags || []).join(' • ')}</Text>
             <CostEstimate recipe={item} servings={Number(servingsById[item.id] || '1') || 1} />
@@ -77,11 +83,9 @@ export default function Meals() {
                 value={servingsById[item.id] || '1'}
                 onChangeText={(v) => setServings((p) => ({ ...p, [item.id]: v }))}
               />
-              <Pressable onPress={() => addToPlan(item)} style={styles.addBtn}>
-                <Text style={styles.addText}>Add</Text>
-              </Pressable>
+              <Button title="Add" onPress={() => addToPlan(item)} />
             </View>
-          </View>
+          </Card>
         )}
       />
     </View>
@@ -110,15 +114,25 @@ function CostEstimate({ recipe, servings }: { recipe: Recipe; servings: number }
         setText('Select stores to see savings');
         return;
       }
-      const mode: 'one' | 'multi' = 'one'; // quick hint; true mode lives on plan, but for card preview show one-store
-      const est = await estimateRecipeCost(recipe, servings, stores, mode);
+      const { getActivePlan } = await import('@/db');
+      const ap = await getActivePlan();
+      const est = await estimateRecipeCost(recipe, servings, stores, 'one');
       if (!est.oneStoreBest) {
         setText('No price data yet');
         return;
       }
       const unknown = est.oneStoreBest.unknown.length;
       const approx = unknown > 0 ? '~' : '';
-      setText(`${approx}$${est.oneStoreBest.cost.toFixed(2)} at ${est.oneStoreBest.storeName}${unknown ? ` • ${unknown} unknown` : ''}`);
+      let line = `${approx}$${est.oneStoreBest.cost.toFixed(2)} at ${est.oneStoreBest.storeName}`;
+      if (unknown) line += ` • ${unknown} unknown`;
+      if ((ap?.storeMode || 'one') === 'multi' && stores.length > 1) {
+        const m = await estimateRecipeCost(recipe, servings, stores, 'multi');
+        if (m.multiStore && est.oneStoreBest) {
+          const delta = est.oneStoreBest.cost - m.multiStore.cost;
+          if (delta > 0.01) line += ` • save ~$${delta.toFixed(2)} multi-store`;
+        }
+      }
+      setText(line);
     })();
   }, [recipe.id, servings, profile?.preferredStores?.join(',')]);
   return <Text style={{ fontSize: 12, color: '#0a7', marginTop: 6 }}>{text}</Text>;

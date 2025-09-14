@@ -1,7 +1,10 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Button, Switch, Alert } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TextInput, Switch, Alert } from 'react-native';
 import { useApp } from '@/state/AppContext';
-import { upsertPlan, setActivePlan, addShoppingItems } from '@/db';
+import { upsertPlan, setActivePlan, addShoppingItems, getActivePlan, estimatePlanCost, assignStoresForPlanItems } from '@/db';
+import { Button } from '@/ui/Button';
+import { Input } from '@/ui/Input';
+import { SwitchRow } from '@/ui/SwitchRow';
 
 export default function Plan() {
   const { profile } = useApp();
@@ -9,6 +12,7 @@ export default function Plan() {
   const [type, setType] = useState<'weekly' | 'event'>('weekly');
   const [multi, setMulti] = useState(false);
   const [budget, setBudget] = useState('');
+  const [summary, setSummary] = useState<string>('');
 
   const onCreate = async () => {
     if (!profile) return Alert.alert('Complete profile first');
@@ -44,25 +48,56 @@ export default function Plan() {
     Alert.alert('Items added', 'Sample items added to active plan');
   };
 
+  const refreshSummary = async () => {
+    const ap = await getActivePlan();
+    if (!ap) { setSummary('No active plan'); return; }
+    const stores = profile?.preferredStores || [];
+    if (stores.length === 0) { setSummary('Select stores in onboarding'); return; }
+    const one = await estimatePlanCost(ap.id, stores, 'one');
+    let line = one.oneStoreBest ? `$${one.oneStoreBest.cost.toFixed(2)} at ${one.oneStoreBest.storeName}` : 'No price data';
+    if (ap.storeMode === 'multi' && stores.length > 1) {
+      const multiEst = await estimatePlanCost(ap.id, stores, 'multi');
+      if (multiEst.multiStore && one.oneStoreBest) {
+        const delta = one.oneStoreBest.cost - multiEst.multiStore.cost;
+        if (delta > 0.01) line += ` • save ~$${delta.toFixed(2)} multi-store`;
+      }
+    }
+    const unk = one.oneStoreBest?.unknown?.length || 0;
+    if (unk) line += ` • ${unk} unknown`;
+    setSummary(line);
+  };
+
+  useEffect(() => { refreshSummary(); }, []);
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Plans</Text>
       <Text style={styles.label}>Name</Text>
-      <TextInput value={name} onChangeText={setName} style={styles.input} placeholder="e.g., Week 42" />
+      <Input value={name} onChangeText={setName} placeholder="e.g., Week 42" />
       <View style={styles.row}>
         <Text style={styles.label}>Weekly</Text>
         <Switch value={type === 'weekly'} onValueChange={(v) => setType(v ? 'weekly' : 'event')} />
         <Text style={styles.label}>Event</Text>
       </View>
       <Text style={styles.label}>Per-plan budget (USD)</Text>
-      <TextInput value={budget} onChangeText={setBudget} keyboardType="decimal-pad" style={styles.input} />
-      <View style={styles.row}>
-        <Text style={styles.label}>Allow multi-store optimization</Text>
-        <Switch value={multi} onValueChange={setMulti} />
-      </View>
+      <Input value={budget} onChangeText={setBudget} keyboardType="decimal-pad" />
+      <SwitchRow label="Allow multi-store optimization" value={multi} onValueChange={setMulti} />
+      <View style={{ height: 8 }} />
       <Button title="Create & Set Active" onPress={onCreate} />
       <View style={{ height: 12 }} />
       <Button title="Add Sample Items" onPress={onAddSampleItems} />
+      <View style={{ height: 16 }} />
+      <Text style={styles.subtitle}>Active Plan Summary</Text>
+      <Text style={styles.summary}>{summary}</Text>
+      <View style={{ height: 8 }} />
+      <Button title="Assign stores to list items" onPress={async () => {
+        const ap = await getActivePlan();
+        if (!ap) return Alert.alert('No active plan');
+        const stores = profile?.preferredStores || [];
+        if (stores.length === 0) return Alert.alert('Pick stores');
+        await assignStoresForPlanItems(ap.id, stores, ap.storeMode);
+        Alert.alert('Assigned', 'Items now tagged with suggested stores');
+      }} />
     </View>
   );
 }
@@ -72,5 +107,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
   label: { fontSize: 14, color: '#444', marginTop: 8 },
   input: { borderColor: '#ccc', borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, padding: 10, marginTop: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  subtitle: { fontSize: 16, fontWeight: '700' },
+  summary: { fontSize: 14, color: '#0a7', marginTop: 6 }
 });

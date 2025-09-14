@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { useApp } from '@/state/AppContext';
+import { Input } from '@/ui/Input';
+import { Button } from '@/ui/Button';
 
 export default function ProfileSetup() {
   const { setProfile } = useApp();
@@ -27,27 +29,27 @@ export default function ProfileSetup() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Set up your profile</Text>
-      <TextInput placeholder="Name" value={name} onChangeText={setName} style={styles.input} />
-      <TextInput
+      <Input placeholder="Name" value={name} onChangeText={setName} style={styles.input} />
+      <Input
         placeholder="Weekly budget (USD)"
         value={weeklyBudget}
         onChangeText={setWeeklyBudget}
         keyboardType="decimal-pad"
         style={styles.input}
       />
-      <TextInput
+      <Input
         placeholder="Diet types (comma-separated)"
         value={dietTypes}
         onChangeText={setDietTypes}
         style={styles.input}
       />
-      <TextInput
+      <Input
         placeholder="Allergies (comma-separated)"
         value={allergies}
         onChangeText={setAllergies}
         style={styles.input}
       />
-      <TextInput
+      <Input
         placeholder="Dislikes (comma-separated)"
         value={dislikes}
         onChangeText={setDislikes}

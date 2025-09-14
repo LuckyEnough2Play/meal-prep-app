@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { View, Text, Button, StyleSheet, Switch } from 'react-native';
+import { View, Text, StyleSheet, Switch } from 'react-native';
 import { router } from 'expo-router';
 import { useApp } from '@/state/AppContext';
 import { MAJOR_STORES } from '@/constants/stores';
+import { Button } from '@/ui/Button';
+import { SwitchRow } from '@/ui/SwitchRow';
 
 export default function StoreSelection() {
   const { profile, setProfile } = useApp();
@@ -25,18 +27,14 @@ export default function StoreSelection() {
     <View style={styles.container}>
       <Text style={styles.title}>Select your grocers</Text>
       {MAJOR_STORES.map((s) => (
-        <View key={s.id} style={styles.row}>
-          <Text style={styles.label}>{s.name}</Text>
-          <Switch
-            value={selected[s.id]}
-            onValueChange={(v) => setSelected((prev) => ({ ...prev, [s.id]: v }))}
-          />
-        </View>
+        <SwitchRow key={s.id}
+          label={s.name}
+          value={selected[s.id]}
+          onValueChange={(v) => setSelected((prev) => ({ ...prev, [s.id]: v }))}
+        />
       ))}
-      <View style={[styles.row, { marginTop: 16 }]}>
-        <Text style={styles.label}>Allow multi-store optimization</Text>
-        <Switch value={multiStore} onValueChange={setMultiStore} />
-      </View>
+      <SwitchRow label="Allow multi-store optimization" value={multiStore} onValueChange={setMultiStore} />
+      <View style={{ height: 10 }} />
       <Button title="Continue" onPress={onContinue} />
     </View>
   );

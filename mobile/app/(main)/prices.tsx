@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, Switch, FlatList, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Switch, FlatList, Alert, ScrollView } from 'react-native';
 import { MAJOR_STORES } from '@/constants/stores';
 import { ensureStore, listStoreItems, seedSamplePrices, upsertStoreItem } from '@/db';
+import { Input } from '@/ui/Input';
+import { Button } from '@/ui/Button';
 
 export default function Prices() {
   const [storeId, setStoreId] = useState(MAJOR_STORES[0].id);
@@ -52,24 +54,22 @@ export default function Prices() {
         ))}
       </View>
 
-      <Pressable onPress={onSeed} style={styles.seedBtn}>
-        <Text style={styles.seedText}>Seed Sample Prices</Text>
-      </Pressable>
+      <Button title="Seed Sample Prices" onPress={onSeed} />
 
       <Text style={styles.section}>Add Item</Text>
-      <View style={styles.formRow}><TextInput placeholder="Name" value={name} onChangeText={setName} style={styles.input} /></View>
+      <View style={styles.formRow}><Input placeholder="Name" value={name} onChangeText={setName} /></View>
       <View style={styles.formRow}>
-        <TextInput placeholder="Package size" keyboardType="decimal-pad" value={pkg} onChangeText={setPkg} style={[styles.input, styles.inputHalf]} />
-        <TextInput placeholder="Unit (e.g., lb, oz)" value={unit} onChangeText={setUnit} style={[styles.input, styles.inputHalf]} />
+        <Input placeholder="Package size" keyboardType="decimal-pad" value={pkg} onChangeText={setPkg} style={styles.inputHalf} />
+        <Input placeholder="Unit (e.g., lb, oz)" value={unit} onChangeText={setUnit} style={styles.inputHalf} />
       </View>
       <View style={styles.formRow}>
-        <TextInput placeholder="Price (USD)" keyboardType="decimal-pad" value={price} onChangeText={setPrice} style={[styles.input, styles.inputHalf]} />
+        <Input placeholder="Price (USD)" keyboardType="decimal-pad" value={price} onChangeText={setPrice} style={styles.inputHalf} />
         <View style={[styles.inputHalf, styles.saleRow]}>
           <Text>On sale</Text>
           <Switch value={onSale} onValueChange={setOnSale} />
         </View>
       </View>
-      <Pressable onPress={onAdd} style={styles.addBtn}><Text style={styles.addText}>Add / Update</Text></Pressable>
+      <Button title="Add / Update" onPress={onAdd} />
 
       <Text style={styles.section}>Items</Text>
       <FlatList
@@ -94,17 +94,11 @@ const styles = StyleSheet.create({
   storeBtnActive: { backgroundColor: '#eefaf6', borderColor: '#0a7' },
   storeText: { color: '#333' },
   storeTextActive: { color: '#0a7', fontWeight: '700' },
-  seedBtn: { backgroundColor: '#07a', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, marginTop: 10, alignSelf: 'flex-start' },
-  seedText: { color: 'white', fontWeight: '700' },
   section: { fontSize: 16, fontWeight: '700', marginTop: 16 },
   formRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  input: { flex: 1, borderColor: '#ccc', borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, padding: 10 },
   inputHalf: { flex: 1 },
   saleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderColor: '#ccc', borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, paddingHorizontal: 10 },
-  addBtn: { backgroundColor: '#0a7', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, marginTop: 10, alignSelf: 'flex-start' },
-  addText: { color: 'white', fontWeight: '700' },
   itemRow: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eee' },
   itemName: { fontSize: 16, fontWeight: '600' },
   itemMeta: { fontSize: 12, color: '#666', marginTop: 2 }
 });
-

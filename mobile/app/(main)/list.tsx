@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, FlatList, RefreshControl } from 'react-native';
 import { getActivePlan, listShoppingItems, toggleShoppingItemChecked } from '@/db';
+import * as SQLite from 'expo-sqlite';
 import { useApp } from '@/state/AppContext';
 
 export default function List() {
@@ -8,6 +9,7 @@ export default function List() {
   const [planId, setPlanId] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [storeNames, setStoreNames] = useState<Record<string, string>>({});
 
   const load = async () => {
     setRefreshing(true);
@@ -15,6 +17,18 @@ export default function List() {
     setPlanId(ap?.id ?? null);
     const data = ap ? await listShoppingItems(ap.id) : [];
     setItems(data);
+    // Load store names
+    try {
+      const db = SQLite.openDatabase('marble.db');
+      await new Promise<void>((resolve) => db.readTransaction((tx) => {
+        tx.executeSql('SELECT id,name FROM store', [], (_tx, rs) => {
+          const map: Record<string, string> = {};
+          for (const r of (rs.rows as any)._array || []) map[r.id] = r.name;
+          setStoreNames(map);
+          resolve();
+        });
+      }));
+    } catch {}
     setRefreshing(false);
   };
 
@@ -41,7 +55,7 @@ export default function List() {
           return (
             <Pressable onPress={() => toggle(item.id)} style={styles.row}>
               <Text style={[styles.item, checked && styles.checked]}>
-                {item.name} — {item.qty} {item.unit || ''}
+                {item.storeId ? `[${storeNames[item.storeId] || item.storeId}] ` : ''}{item.name} — {item.qty} {item.unit || ''}
               </Text>
             </Pressable>
           );

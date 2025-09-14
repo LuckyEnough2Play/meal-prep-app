@@ -293,6 +293,7 @@ export type EstimateResult = {
   perStore: Array<{ storeId: string; storeName: string; cost: number; unknown: string[] }>;
   oneStoreBest?: { storeId: string; storeName: string; cost: number; unknown: string[] };
   multiStore?: { cost: number; unknown: string[] };
+  suggestions?: Array<{ name: string; bestStoreId?: string; bestStoreName?: string; estCost?: number }>;
 };
 
 export async function estimateRecipeCost(recipe: Recipe, servings: number, storeIds: string[], storeMode: 'one' | 'multi'): Promise<EstimateResult> {
@@ -330,11 +331,13 @@ export async function estimateRecipeCost(recipe: Recipe, servings: number, store
   }
 
   let multiStore = undefined as EstimateResult['multiStore'];
+  const suggestions: EstimateResult['suggestions'] = [];
   if (storeMode === 'multi' && storeIds.length > 1) {
     let cost = 0;
     const unknown: string[] = [];
     for (const need of scaled) {
       let best = Infinity;
+      let bestStore: string | undefined;
       let found = false;
       for (const sid of storeIds) {
         const items = itemsByStore[sid] || [];
@@ -343,16 +346,82 @@ export async function estimateRecipeCost(recipe: Recipe, servings: number, store
           const pack = match.packageSize || 1;
           const packsNeeded = Math.ceil((need.qty || 0) / pack);
           const c = packsNeeded * (match.price || 0);
-          if (c < best) best = c;
+          if (c < best) { best = c; bestStore = sid; }
           found = true;
         }
       }
-      if (found) cost += best; else unknown.push(need.name);
+      if (found) {
+        cost += best;
+        suggestions?.push({ name: need.name, bestStoreId: bestStore, bestStoreName: storeNames[bestStore || ''], estCost: best });
+      } else {
+        unknown.push(need.name);
+        suggestions?.push({ name: need.name });
+      }
     }
     multiStore = { cost, unknown };
   }
 
-  return { perStore, oneStoreBest, multiStore };
+  return { perStore, oneStoreBest, multiStore, suggestions };
+}
+
+export async function getPlanMealsWithRecipes(planId: string): Promise<Array<{ recipe: Recipe; servings: number }>> {
+  const rs = await run<SQLite.SQLResultSet>(`SELECT meals_json FROM plan WHERE id = ?`, [planId]);
+  const row = (rs.rows as any)._array?.[0];
+  const meals = row ? (JSON.parse(row.meals_json || '[]') as Array<{ recipeId: string; servings: number }>) : [];
+  if (meals.length === 0) return [];
+  const ids = meals.map((m) => m.recipeId);
+  const placeholders = ids.map(() => '?').join(',');
+  const rsR = await run<SQLite.SQLResultSet>(`SELECT * FROM recipe WHERE id IN (${placeholders})`, ids);
+  const byId: Record<string, Recipe> = {};
+  for (const r of (rsR.rows as any)._array as any[]) {
+    byId[r.id] = {
+      id: r.id,
+      name: r.name,
+      ingredients: JSON.parse(r.ingredients_json || '[]'),
+      instructions: r.instructions ?? undefined,
+      tags: safeParseArray(r.tags),
+      dietTypes: safeParseArray(r.diet_types),
+      allergens: safeParseArray(r.allergens),
+      timePrep: r.time_prep ?? undefined,
+      timeCook: r.time_cook ?? undefined,
+      createdBy: r.created_by ?? undefined
+    };
+  }
+  return meals
+    .filter((m) => byId[m.recipeId])
+    .map((m) => ({ recipe: byId[m.recipeId], servings: m.servings }));
+}
+
+export async function estimatePlanCost(planId: string, storeIds: string[], storeMode: 'one' | 'multi'): Promise<EstimateResult> {
+  const entries = await getPlanMealsWithRecipes(planId);
+  // Aggregate all ingredients
+  const map: Record<string, { name: string; qty: number; unit: string | null }> = {};
+  for (const e of entries) {
+    for (const ing of e.recipe.ingredients || []) {
+      const key = `${(ing.name || '').toLowerCase()}|${ing.unit || ''}`;
+      if (!map[key]) map[key] = { name: ing.name || '', qty: 0, unit: ing.unit || null };
+      map[key].qty += (ing.qty || 0) * e.servings;
+    }
+  }
+  const synthetic: Recipe = { id: `plan:${planId}`, name: 'Plan Aggregate', ingredients: Object.values(map) } as any;
+  return estimateRecipeCost(synthetic, 1, storeIds, storeMode);
+}
+
+export async function assignStoresForPlanItems(planId: string, storeIds: string[], storeMode: 'one' | 'multi'): Promise<void> {
+  // Assign based on per-item cheapest across stores (for multi) or the one-store best store for all items
+  const est = await estimatePlanCost(planId, storeIds, storeMode);
+  let defaultStore: string | undefined = est.oneStoreBest?.storeId;
+  const items = await listShoppingItems(planId);
+  for (const it of items) {
+    let storeId: string | undefined = defaultStore;
+    if (storeMode === 'multi' && est.suggestions) {
+      const s = est.suggestions.find((x) => x.name.toLowerCase().includes(it.name.toLowerCase()));
+      if (s?.bestStoreId) storeId = s.bestStoreId;
+    }
+    if (storeId && it.storeId !== storeId) {
+      await run(`UPDATE shopping_list_item SET store_id = ? WHERE id = ?`, [storeId, it.id]);
+    }
+  }
 }
 
 export async function setActivePlan(planId: string): Promise<void> {
