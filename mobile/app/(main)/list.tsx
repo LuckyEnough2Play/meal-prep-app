@@ -1,31 +1,51 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
-
-type Item = { id: string; name: string; qty: number; unit?: string; checked?: boolean };
+import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, FlatList, RefreshControl } from 'react-native';
+import { getActivePlan, listShoppingItems, toggleShoppingItemChecked } from '@/db';
+import { useApp } from '@/state/AppContext';
 
 export default function List() {
-  const [items, setItems] = useState<Item[]>([
-    { id: '1', name: 'Chicken breast', qty: 2, unit: 'lb' },
-    { id: '2', name: 'Broccoli', qty: 2, unit: 'heads' }
-  ]);
+  const { profile } = useApp();
+  const [planId, setPlanId] = useState<string | null>(null);
+  const [items, setItems] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const toggle = (id: string) => {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked: !i.checked } : i)));
+  const load = async () => {
+    setRefreshing(true);
+    const ap = await getActivePlan();
+    setPlanId(ap?.id ?? null);
+    const data = ap ? await listShoppingItems(ap.id) : [];
+    setItems(data);
+    setRefreshing(false);
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const toggle = async (id: string) => {
+    if (!profile) return;
+    await toggleShoppingItemChecked(id, profile.id);
+    await load();
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Shopping List</Text>
+      {!planId && <Text style={{ color: '#666' }}>No active plan. Create one in the Plans tab.</Text>}
       <FlatList
         data={items}
         keyExtractor={(i) => i.id}
-        renderItem={({ item }) => (
-          <Pressable onPress={() => toggle(item.id)} style={styles.row}>
-            <Text style={[styles.item, item.checked && styles.checked]}>
-              {item.name} — {item.qty} {item.unit || ''}
-            </Text>
-          </Pressable>
-        )}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} />}
+        renderItem={({ item }) => {
+          const checked = (item.checkedBy || []).includes(profile?.id);
+          return (
+            <Pressable onPress={() => toggle(item.id)} style={styles.row}>
+              <Text style={[styles.item, checked && styles.checked]}>
+                {item.name} — {item.qty} {item.unit || ''}
+              </Text>
+            </Pressable>
+          );
+        }}
       />
       <Text style={styles.note}>Checking an item syncs to all group members.</Text>
     </View>
@@ -40,4 +60,3 @@ const styles = StyleSheet.create({
   checked: { textDecorationLine: 'line-through', color: '#888' },
   note: { marginTop: 12, color: '#666' }
 });
-

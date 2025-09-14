@@ -67,6 +67,7 @@ export interface Plan {
   storeMode: 'one' | 'multi';
   meals: PlanMealRef[];
   createdBy: string;
+  isActive?: boolean;
 }
 
 export interface ShoppingListItem {
@@ -88,4 +89,3 @@ export interface Group {
   memberIds: string[];
   adminIds: string[];
 }
-
