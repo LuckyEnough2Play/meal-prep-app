@@ -208,3 +208,24 @@
 - Aisle data sources and coverage strategy.
 - Exact encryption library choices per platform (SQLCipher vs platform-provided).
 
+---
+
+## 13. Implementation Alignment (Current Build)
+
+- Platform: React Native via Expo; SQLite (expo-sqlite). Encryption at rest planned via SQLCipher in Bare workflow.
+- Onboarding: Profile (diet, allergies, dislikes, weekly budget) persisted locally.
+- Stores & Pricing:
+  - Manual price entry UI with seed data for major stores.
+  - Alias mapping to link ingredient names → store items for better matching.
+  - Estimates displayed per recipe and per plan; one-store with optional multi-store savings preview.
+- Recipes & Meals: Starter recipes bundled; compatibility filter; serving scale.
+- Plans: Weekly/event creation; active plan; store-mode toggle; list generation; plan summary cost.
+- Shopping List: Consolidation; store assignment tags; check-off persisted locally.
+- Groups: Create/join; QR/link invites using marble:// deep links; per-group keys stored in SecureStore. Sync of data is planned.
+- Backup & Restore: Encrypted export/import (.mmbak) with password; cloud provider integrations post-MVP.
+
+Gaps vs PRD (Planned Next):
+- Encrypted DB at rest (SQLCipher Bare integration).
+- Automated price fetching from grocer sites (opt-in) with freshness indicators.
+- Group sync (E2EE relay/P2P) for shared list/plan state.
+- Event group expiry/extension UI and combined profile logic.
